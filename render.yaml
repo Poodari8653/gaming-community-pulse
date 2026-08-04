@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: gaming-community-pulse
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      # PORT is injected automatically by Render — server.js already reads
+      # process.env.PORT, so no PORT var needs to be set here.

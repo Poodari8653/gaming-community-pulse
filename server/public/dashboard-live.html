@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gaming Community Pulse — Live Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #171a24;
+    --panel-border: #262b3a;
+    --text: #e8eaf0;
+    --muted: #9aa1b4;
+    --accent: #6c8cff;
+    --pos: #3ecf8e;
+    --neg: #ff6b6b;
+    --neu: #f5c451;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+  }
+  header {
+    padding: 28px 32px 20px; border-bottom: 1px solid var(--panel-border);
+    background: linear-gradient(180deg, #171a24, #0f1117);
+  }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  header h1 { margin: 0 0 6px; font-size: 24px; font-weight: 700; }
+  header p.sub { margin: 0; color: var(--muted); font-size: 14px; max-width: 900px; }
+  .banner {
+    margin-top: 14px; padding: 10px 14px; border-radius: var(--radius);
+    background: #1d2333; border: 1px solid #2c3550; font-size: 13px; color: var(--muted);
+  }
+  .banner b { color: var(--text); }
+  .banner.error { background: #331d1d; border-color: #552c2c; color: #ffb3b3; }
+  .legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+  .refresh-box { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .refresh-btn {
+    padding: 9px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent);
+    color: #0b0d13; font-weight: 700; font-size: 13px; cursor: pointer;
+  }
+  .refresh-btn:disabled { opacity: .6; cursor: default; }
+  .last-updated { font-size: 11.5px; color: var(--muted); }
+  main { max-width: 1280px; margin: 0 auto; padding: 24px 32px 60px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+  .chip {
+    padding: 7px 14px; border-radius: 999px; border: 1px solid var(--panel-border);
+    background: var(--panel); color: var(--muted); font-size: 13px; cursor: pointer;
+    transition: all .15s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.active { background: var(--accent); color: #0b0d13; border-color: var(--accent); font-weight: 600; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 14px; margin-bottom: 24px; }
+  .kpi { background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 16px 18px; }
+  .kpi .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .kpi .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .kpi .value.pos { color: var(--pos); } .kpi .value.neg { color: var(--neg); }
+  .grid2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; margin-bottom: 18px; }
+  .grid2b { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .grid2, .grid2b { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .panel h2 { margin: 0 0 4px; font-size: 15px; font-weight: 700; }
+  .panel p.desc { margin: 0 0 14px; color: var(--muted); font-size: 12.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--panel-border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .tag.positive { background: rgba(62,207,142,.15); color: var(--pos); }
+  .tag.negative { background: rgba(255,107,107,.15); color: var(--neg); }
+  .tag.neutral { background: rgba(245,196,81,.15); color: var(--neu); }
+  .platform-tag { font-size: 11px; color: var(--muted); border: 1px solid var(--panel-border); border-radius: 6px; padding: 1px 6px; }
+  .post-card { padding: 10px 0; border-bottom: 1px solid var(--panel-border); font-size: 13.5px; }
+  .post-card:last-child { border-bottom: none; }
+  .post-meta { display: flex; gap: 8px; align-items: center; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+  .search-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  input[type=text], select {
+    background: #10131c; border: 1px solid var(--panel-border); color: var(--text);
+    padding: 8px 10px; border-radius: 8px; font-size: 13px;
+  }
+  .scroll-table { max-height: 360px; overflow-y: auto; }
+  footer { color: var(--muted); font-size: 12px; padding: 20px 32px 40px; border-top: 1px solid var(--panel-border); }
+  a { color: var(--accent); }
+
+  .range-wrap { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--panel-border); }
+  .range-label-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .range-label-row b { color: var(--text); }
+  .range-slider { position: relative; height: 30px; }
+  .range-track-bg {
+    position: absolute; top: 13px; left: 0; right: 0; height: 4px; border-radius: 2px; background: #2a2f40;
+  }
+  .range-track-fill {
+    position: absolute; top: 13px; height: 4px; border-radius: 2px; background: var(--accent);
+  }
+  .range-slider input[type=range] {
+    position: absolute; top: 0; left: 0; width: 100%; margin: 0; pointer-events: none;
+    -webkit-appearance: none; appearance: none; background: transparent; height: 30px;
+  }
+  .range-slider input[type=range]::-webkit-slider-thumb {
+    pointer-events: all; -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
+    border: 2px solid #0b0d13; cursor: pointer; margin-top: 6px;
+  }
+  .range-slider input[type=range]::-moz-range-thumb {
+    pointer-events: all; width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
+    border: 2px solid #0b0d13; cursor: pointer;
+  }
+  .range-slider input[type=range]::-webkit-slider-runnable-track { background: transparent; }
+  .range-slider input[type=range]::-moz-range-track { background: transparent; }
+  .reset-range-btn {
+    font-size: 11.5px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0;
+    text-decoration: underline;
+  }
+  .video-card {
+    padding: 10px 0; border-bottom: 1px solid var(--panel-border); font-size: 13px;
+  }
+  .video-card:last-child { border-bottom: none; }
+  .video-card a { color: var(--text); text-decoration: none; font-weight: 600; }
+  .video-card a:hover { color: var(--accent); }
+  #loadingOverlay {
+    position: fixed; inset: 0; background: rgba(15,17,23,.85); display: flex;
+    align-items: center; justify-content: center; z-index: 999; font-size: 15px; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">Fetching live YouTube data…</div>
+
+<header>
+  <div class="header-row">
+    <div>
+      <h1>Gaming Community Pulse — Live Dashboard</h1>
+      <p class="sub">Social listening dashboard covering public discussion of PUBG, Once Human, Marvel Rivals, Where Winds Meet, and World of Warcraft across Reddit, Discord, and YouTube.</p>
+    </div>
+    <div class="refresh-box">
+      <button class="refresh-btn" id="refreshBtn">Refresh live data</button>
+      <span class="last-updated" id="lastUpdated"></span>
+    </div>
+  </div>
+  <div class="banner" id="dataBanner">Loading data source status…</div>
+  <div class="banner error" id="errorBanner" style="display:none;"></div>
+</header>
+
+<main>
+  <div class="controls" id="gameFilter"></div>
+
+  <div class="kpis" id="kpiRow"></div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>Weekly discussion volume</h2>
+      <p class="desc">Reddit + Discord + live YouTube volume by week — drag the handles to zoom into a time window. Every other panel below reacts to your selection.</p>
+      <canvas id="volumeChart" height="140"></canvas>
+      <div class="range-wrap">
+        <div class="range-label-row">
+          <span>Window: <b id="rangeLabel">—</b></span>
+          <button class="reset-range-btn" id="resetRangeBtn">Reset to full range</button>
+        </div>
+        <div class="range-slider">
+          <div class="range-track-bg"></div>
+          <div class="range-track-fill" id="rangeTrackFill"></div>
+          <input type="range" id="rangeStartInput" min="0" max="1" value="0" step="1">
+          <input type="range" id="rangeEndInput" min="0" max="1" value="1" step="1">
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Sentiment mix</h2>
+      <p class="desc">Share of positive / neutral / negative discussion, all platforms combined, in the selected window.</p>
+      <canvas id="sentimentChart" height="140"></canvas>
+    </div>
+  </div>
+
+  <div class="grid2b" style="grid-template-columns: 1fr;">
+    <div class="panel">
+      <h2>Videos in this window</h2>
+      <p class="desc">The actual YouTube videos (from each game's channel) whose publish date falls inside your selected time window.</p>
+      <div id="videosList" class="scroll-table"></div>
+    </div>
+  </div>
+
+  <div class="grid2b">
+    <div class="panel">
+      <h2>Engagement by game</h2>
+      <p class="desc">Total upvotes / likes / reactions across all collected records.</p>
+      <canvas id="engagementChart" height="160"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Recurring themes</h2>
+      <p class="desc">Most common discussion themes and their average sentiment (Reddit + Discord sample).</p>
+      <div class="scroll-table"><table id="themeTable"><thead><tr><th>Theme</th><th>Mentions</th><th>Sentiment</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>Top posts &amp; comments</h2>
+      <p class="desc">Most-liked / most-viral comments in the current selection, ranked by like count (each video's comments are pulled both by recency and by YouTube's own "top comments" ranking, so a viral old comment won't be missed).</p>
+      <div id="topPosts"></div>
+    </div>
+    <div class="panel">
+      <h2>Recurring questions</h2>
+      <p class="desc">Community questions worth a FAQ, patch note, or creator briefing.</p>
+      <div id="questionsList"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Browse raw data</h2>
+    <p class="desc">Search across all records (live YouTube + illustrative Reddit/Discord samples).</p>
+    <div class="search-row">
+      <input type="text" id="searchBox" placeholder="Search text..." style="flex:1; min-width:220px;">
+      <select id="platformFilter">
+        <option value="">All platforms</option>
+        <option value="Reddit">Reddit</option>
+        <option value="Discord">Discord</option>
+        <option value="YouTube">YouTube</option>
+      </select>
+      <select id="sentimentFilter">
+        <option value="">All sentiment</option>
+        <option value="positive">Positive</option>
+        <option value="neutral">Neutral</option>
+        <option value="negative">Negative</option>
+      </select>
+    </div>
+    <div class="scroll-table">
+      <table id="dataTable">
+        <thead><tr><th>Game</th><th>Platform</th><th>Type</th><th>Text</th><th>Score</th><th>Sentiment</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Live prototype. YouTube comment data is fetched live via the YouTube Data API on each load/refresh; Reddit and Discord data is clearly-labeled illustrative sample data until API/bot access is configured. See report/GAMING_COMMUNITY_PULSE_REPORT.md for full methodology.
+</footer>
+
+<script>
+let ANALYSIS = null;
+let RECORDS = [];
+let VIDEOS = [];
+let GAMES = [];
+let currentGame = "All";
+
+let ALL_WEEKS = [];       // sorted list of unique week-start strings across all games
+let rangeStartIdx = 0;
+let rangeEndIdx = 0;
+
+const COLORS = ["#6c8cff", "#3ecf8e", "#f5c451", "#ff6b6b", "#b98cff", "#4dd0e1", "#ff9f6c"];
+let gameColor = {};
+
+function fmtNum(n){ return n.toLocaleString(); }
+
+// Mirrors server.js's isoWeekStart so client-side range filtering buckets
+// records into the exact same weeks shown in the volume chart.
+function isoWeekStart(dateStr){
+  const d = new Date(dateStr);
+  const day = (d.getUTCDay() + 6) % 7; // Monday = 0
+  d.setUTCDate(d.getUTCDate() - day);
+  d.setUTCHours(0,0,0,0);
+  return d.toISOString().slice(0,10);
+}
+
+const DEFAULT_VISIBLE_WEEKS = 8; // on load, zoom to the most recent N weeks instead of full history
+
+function computeAllWeeks(){
+  const set = new Set();
+  GAMES.forEach(g => (ANALYSIS.weekly_volume[g] || []).forEach(w => set.add(w.week)));
+  ALL_WEEKS = Array.from(set).sort();
+  // Default view: the most recent DEFAULT_VISIBLE_WEEKS weeks. Live YouTube
+  // comments can trail back much further than the synthetic sample's 8-week
+  // window (whenever a channel's older tracked videos were posted), which
+  // would otherwise open on a long, sparse, near-flat stretch by default.
+  // Drag the left handle to go further back — nothing is hidden, just not
+  // shown by default.
+  rangeEndIdx = Math.max(0, ALL_WEEKS.length - 1);
+  rangeStartIdx = Math.max(0, ALL_WEEKS.length - DEFAULT_VISIBLE_WEEKS);
+}
+
+function inSelectedRange(timestamp){
+  if (!ALL_WEEKS.length) return true;
+  const wk = isoWeekStart(timestamp);
+  return wk >= ALL_WEEKS[rangeStartIdx] && wk <= ALL_WEEKS[rangeEndIdx];
+}
+
+async function loadData(force) {
+  document.getElementById("loadingOverlay").style.display = "flex";
+  document.getElementById("refreshBtn").disabled = true;
+  try {
+    const res = await fetch("/api/analysis" + (force ? "?force=1" : ""));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to load data");
+
+    ANALYSIS = data;
+    RECORDS = data.records || [];
+    VIDEOS = data.videos || [];
+    GAMES = data.games;
+    GAMES.forEach((g,i) => gameColor[g] = COLORS[i % COLORS.length]);
+    computeAllWeeks();
+
+    document.getElementById("lastUpdated").textContent = "Last updated: " + new Date(data.generated_at).toLocaleString();
+
+    if (data.data_sources) {
+      const ds = data.data_sources;
+      const dot = (live) => `<span class="legend-dot" style="background:${live ? '#3ecf8e' : '#9aa1b4'}"></span>`;
+      document.getElementById("dataBanner").innerHTML =
+        `${dot(true)}<b>YouTube:</b> ${ds.youtube}` +
+        `&nbsp;&nbsp;${dot(ds.discord.startsWith('live'))}<b>Discord:</b> ${ds.discord}` +
+        `&nbsp;&nbsp;${dot(false)}<b>Reddit:</b> ${ds.reddit}`;
+    }
+
+    const errBanner = document.getElementById("errorBanner");
+    if (data.fetch_errors && data.fetch_errors.length) {
+      errBanner.style.display = "block";
+      errBanner.innerHTML = "<b>Some sources failed to fetch:</b> " +
+        data.fetch_errors.map(e => `${e.game} (${e.message})`).join("; ");
+    } else {
+      errBanner.style.display = "none";
+    }
+
+    renderAll();
+  } catch (err) {
+    document.getElementById("errorBanner").style.display = "block";
+    document.getElementById("errorBanner").innerHTML = "<b>Couldn't load live data:</b> " + err.message +
+      "<br>Check that server/.env has a valid YOUTUBE_API_KEY and that the server has internet access.";
+  } finally {
+    document.getElementById("loadingOverlay").style.display = "none";
+    document.getElementById("refreshBtn").disabled = false;
+  }
+}
+
+function buildFilterChips(){
+  const el = document.getElementById("gameFilter");
+  const all = ["All", ...GAMES];
+  el.innerHTML = all.map(g => `<div class="chip ${g===currentGame?'active':''}" data-game="${g}">${g}</div>`).join("");
+  el.querySelectorAll(".chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      currentGame = chip.dataset.game;
+      renderAll();
+    });
+  });
+}
+
+function selectedRecords(){
+  let recs = currentGame === "All" ? RECORDS : RECORDS.filter(r => r.game === currentGame);
+  recs = recs.filter(r => inSelectedRange(r.timestamp));
+  return recs;
+}
+
+function selectedVideos(){
+  let vids = currentGame === "All" ? VIDEOS : VIDEOS.filter(v => v.game === currentGame);
+  vids = vids.filter(v => inSelectedRange(v.publishedAt));
+  return vids;
+}
+
+function renderKPIs(){
+  const recs = selectedRecords();
+  const n = recs.length;
+  const avgSent = n ? recs.reduce((a,r)=>a+r.sentiment_score,0)/n : 0;
+  const totalEng = recs.reduce((a,r)=>a+r.score,0);
+  const realCount = recs.filter(r=>r.data_type==="real").length;
+  const kpis = [
+    {label:"Records in view", value: fmtNum(n)},
+    {label:"Avg. sentiment", value: (avgSent>=0?"+":"")+avgSent.toFixed(2), cls: avgSent>0.05?"pos":(avgSent<-0.05?"neg":"")},
+    {label:"Total engagement", value: fmtNum(totalEng)},
+    {label:"Live (YouTube) records", value: fmtNum(realCount)},
+  ];
+  document.getElementById("kpiRow").innerHTML = kpis.map(k => `
+    <div class="kpi"><div class="label">${k.label}</div><div class="value ${k.cls||''}">${k.value}</div></div>
+  `).join("");
+}
+
+let volumeChartInst, sentimentChartInst, engagementChartInst;
+
+// All render functions below recompute directly from RECORDS filtered by the
+// current game chip AND the selected time-range slider, so every panel on the
+// page — not just the volume chart — reacts to the window you choose.
+
+function renderVolumeChart(){
+  const ctx = document.getElementById("volumeChart");
+  const gamesToShow = currentGame === "All" ? GAMES : [currentGame];
+  const windowWeeks = ALL_WEEKS.slice(rangeStartIdx, rangeEndIdx + 1);
+
+  const datasets = gamesToShow.map(g => {
+    const byWeek = Object.fromEntries((ANALYSIS.weekly_volume[g] || []).map(w => [w.week, w.count]));
+    return {
+      label: g,
+      data: windowWeeks.map(wk => byWeek[wk] || 0),
+      borderColor: gameColor[g],
+      backgroundColor: gameColor[g]+"33",
+      tension: .3,
+      fill: false,
+    };
+  });
+  if (volumeChartInst) volumeChartInst.destroy();
+  volumeChartInst = new Chart(ctx, {
+    type: "line",
+    data: { labels: windowWeeks, datasets },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: "#9aa1b4" } } },
+      scales: {
+        x: { ticks: { color: "#9aa1b4" }, grid: { color: "#262b3a" } },
+        y: { ticks: { color: "#9aa1b4" }, grid: { color: "#262b3a" }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function renderSentimentChart(){
+  const ctx = document.getElementById("sentimentChart");
+  const gamesToShow = currentGame === "All" ? GAMES : [currentGame];
+  const rangeRecs = RECORDS.filter(r => inSelectedRange(r.timestamp));
+  const pos = [], neu = [], neg = [];
+  gamesToShow.forEach(g => {
+    const recs = rangeRecs.filter(r => r.game === g);
+    pos.push(recs.filter(r => r.sentiment_label === "positive").length);
+    neu.push(recs.filter(r => r.sentiment_label === "neutral").length);
+    neg.push(recs.filter(r => r.sentiment_label === "negative").length);
+  });
+  if (sentimentChartInst) sentimentChartInst.destroy();
+  sentimentChartInst = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: gamesToShow,
+      datasets: [
+        { label: "Positive", data: pos, backgroundColor: "#3ecf8e" },
+        { label: "Neutral", data: neu, backgroundColor: "#f5c451" },
+        { label: "Negative", data: neg, backgroundColor: "#ff6b6b" },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: "#9aa1b4" } } },
+      scales: {
+        x: { stacked: true, ticks: { color: "#9aa1b4" }, grid: { display:false } },
+        y: { stacked: true, ticks: { color: "#9aa1b4" }, grid: { color: "#262b3a" } }
+      }
+    }
+  });
+}
+
+function renderEngagementChart(){
+  const ctx = document.getElementById("engagementChart");
+  const rangeRecs = RECORDS.filter(r => inSelectedRange(r.timestamp));
+  const totals = GAMES.map(g => rangeRecs.filter(r => r.game === g).reduce((a,r)=>a+r.score,0));
+  if (engagementChartInst) engagementChartInst.destroy();
+  engagementChartInst = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: GAMES,
+      datasets: [{
+        label: "Total engagement score",
+        data: totals,
+        backgroundColor: GAMES.map(g => gameColor[g]),
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#9aa1b4" }, grid: { color: "#262b3a" } },
+        y: { ticks: { color: "#9aa1b4" }, grid: { display:false } }
+      }
+    }
+  });
+}
+
+function renderThemeTable(){
+  const tbody = document.querySelector("#themeTable tbody");
+  const recs = selectedRecords().filter(r => r.theme);
+  const agg = {};
+  for (const r of recs) {
+    const key = r.theme + "||" + r.game;
+    if (!agg[key]) agg[key] = { theme: r.theme, game: r.game, count: 0, sentSum: 0 };
+    agg[key].count += 1;
+    agg[key].sentSum += r.sentiment_score;
+  }
+  let themes = Object.values(agg).map(t => ({ ...t, avg_sentiment: t.sentSum / t.count }));
+  themes.sort((a,b) => b.count - a.count);
+  themes = themes.slice(0, 10);
+  tbody.innerHTML = themes.map(t => {
+    const cls = t.avg_sentiment>0.05?"positive":(t.avg_sentiment<-0.05?"negative":"neutral");
+    return `<tr><td>${t.theme} <span class="platform-tag">${t.game}</span></td><td>${t.count}</td><td><span class="tag ${cls}">${t.avg_sentiment>=0?'+':''}${t.avg_sentiment.toFixed(2)}</span></td></tr>`;
+  }).join("");
+}
+
+function renderTopPosts(){
+  const el = document.getElementById("topPosts");
+  let posts = [...selectedRecords()].sort((a,b) => b.score - a.score).slice(0, 8);
+  if (posts.length === 0) {
+    el.innerHTML = `<p style="color:var(--muted); font-size:13px;">No records in this window.</p>`;
+    return;
+  }
+  el.innerHTML = posts.map((p, i) => `
+    <div class="post-card">
+      <div>${i === 0 ? '<span class="tag positive" style="margin-right:6px;">🔥 Most viral</span>' : ''}${p.text}</div>
+      <div class="post-meta">
+        <span class="platform-tag">${p.platform}</span>
+        <span class="platform-tag">${p.game}</span>
+        <span class="tag ${p.sentiment_label}">${p.sentiment_label}</span>
+        <span>👍 ${fmtNum(p.score)} likes</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderQuestions(){
+  const el = document.getElementById("questionsList");
+  let qs = selectedRecords().filter(r => r.text.trim().endsWith("?"));
+  qs.sort((a,b) => b.score - a.score);
+  qs = qs.slice(0, 8);
+  if (qs.length === 0){
+    el.innerHTML = `<p style="color:var(--muted); font-size:13px;">No recurring questions surfaced in this window.</p>`;
+    return;
+  }
+  el.innerHTML = qs.map(q => `
+    <div class="post-card">
+      <div>${q.text}</div>
+      <div class="post-meta">
+        <span class="platform-tag">${q.platform}</span>
+        <span class="platform-tag">${q.game}</span>
+        <span>👍 ${fmtNum(q.score)}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderVideosList(){
+  const el = document.getElementById("videosList");
+  const vids = [...selectedVideos()].sort((a,b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  if (vids.length === 0){
+    el.innerHTML = `<p style="color:var(--muted); font-size:13px;">No videos published in this window (try widening the range).</p>`;
+    return;
+  }
+  el.innerHTML = vids.map(v => `
+    <div class="video-card">
+      <a href="${v.url}" target="_blank" rel="noopener">${v.title}</a>
+      <div class="post-meta">
+        <span class="platform-tag">${v.game}</span>
+        <span>${new Date(v.publishedAt).toLocaleDateString()}</span>
+        <span>👁 ${fmtNum(v.viewCount)}</span>
+        <span>👍 ${fmtNum(v.likeCount)}</span>
+        <span>💬 ${fmtNum(v.commentCount)}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderRangeSlider(){
+  const startInput = document.getElementById("rangeStartInput");
+  const endInput = document.getElementById("rangeEndInput");
+  const maxIdx = Math.max(0, ALL_WEEKS.length - 1);
+  startInput.max = maxIdx; endInput.max = maxIdx;
+  startInput.value = rangeStartIdx; endInput.value = rangeEndIdx;
+
+  const fill = document.getElementById("rangeTrackFill");
+  const pct = (idx) => maxIdx === 0 ? 0 : (idx / maxIdx) * 100;
+  fill.style.left = pct(rangeStartIdx) + "%";
+  fill.style.width = Math.max(0, pct(rangeEndIdx) - pct(rangeStartIdx)) + "%";
+
+  const label = document.getElementById("rangeLabel");
+  if (ALL_WEEKS.length) {
+    label.textContent = `${ALL_WEEKS[rangeStartIdx]} → week of ${ALL_WEEKS[rangeEndIdx]}`;
+  } else {
+    label.textContent = "no data yet";
+  }
+}
+
+function renderDataTable(){
+  const tbody = document.querySelector("#dataTable tbody");
+  const search = document.getElementById("searchBox").value.toLowerCase();
+  const platform = document.getElementById("platformFilter").value;
+  const sentiment = document.getElementById("sentimentFilter").value;
+  let recs = selectedRecords();
+  if (search) recs = recs.filter(r => r.text.toLowerCase().includes(search));
+  if (platform) recs = recs.filter(r => r.platform === platform);
+  if (sentiment) recs = recs.filter(r => r.sentiment_label === sentiment);
+  recs = recs.slice(0, 150);
+  tbody.innerHTML = recs.map(r => `
+    <tr>
+      <td>${r.game}</td>
+      <td><span class="platform-tag">${r.platform}${r.data_type==='real'?' ✓':''}</span></td>
+      <td>${r.content_type}</td>
+      <td style="max-width:420px;">${r.text}</td>
+      <td>${fmtNum(r.score)}</td>
+      <td><span class="tag ${r.sentiment_label}">${r.sentiment_label}</span></td>
+    </tr>
+  `).join("");
+}
+
+function renderAll(){
+  buildFilterChips();
+  renderRangeSlider();
+  renderKPIs();
+  renderVolumeChart();
+  renderSentimentChart();
+  renderEngagementChart();
+  renderThemeTable();
+  renderTopPosts();
+  renderQuestions();
+  renderVideosList();
+  renderDataTable();
+}
+
+document.getElementById("searchBox").addEventListener("input", renderDataTable);
+document.getElementById("platformFilter").addEventListener("change", renderDataTable);
+document.getElementById("sentimentFilter").addEventListener("change", renderDataTable);
+document.getElementById("refreshBtn").addEventListener("click", () => loadData(true));
+
+document.getElementById("rangeStartInput").addEventListener("input", (e) => {
+  let v = Number(e.target.value);
+  if (v > rangeEndIdx) v = rangeEndIdx;
+  rangeStartIdx = v;
+  renderAll();
+});
+document.getElementById("rangeEndInput").addEventListener("input", (e) => {
+  let v = Number(e.target.value);
+  if (v < rangeStartIdx) v = rangeStartIdx;
+  rangeEndIdx = v;
+  renderAll();
+});
+document.getElementById("resetRangeBtn").addEventListener("click", () => {
+  rangeStartIdx = 0;
+  rangeEndIdx = Math.max(0, ALL_WEEKS.length - 1);
+  renderAll();
+});
+
+loadData(false);
+</script>
+
+</body>
+</html>

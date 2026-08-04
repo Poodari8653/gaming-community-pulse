@@ -1,0 +1,830 @@
+{
+  "generated_at": "2026-07-30",
+  "total_records": 507,
+  "games": [
+    "PUBG",
+    "Once Human",
+    "Marvel Rivals",
+    "Where Winds Meet",
+    "World of Warcraft"
+  ],
+  "by_game": {
+    "PUBG": {
+      "record_count": 102,
+      "avg_sentiment": -0.003,
+      "total_engagement_score": 11024,
+      "platforms": {
+        "YouTube": 17,
+        "Reddit": 57,
+        "Discord": 28
+      }
+    },
+    "Once Human": {
+      "record_count": 98,
+      "avg_sentiment": -0.025,
+      "total_engagement_score": 9222,
+      "platforms": {
+        "YouTube": 12,
+        "Reddit": 56,
+        "Discord": 30
+      }
+    },
+    "Marvel Rivals": {
+      "record_count": 108,
+      "avg_sentiment": 0.099,
+      "total_engagement_score": 9731,
+      "platforms": {
+        "YouTube": 11,
+        "Reddit": 62,
+        "Discord": 35
+      }
+    },
+    "Where Winds Meet": {
+      "record_count": 99,
+      "avg_sentiment": 0.185,
+      "total_engagement_score": 9308,
+      "platforms": {
+        "YouTube": 7,
+        "Reddit": 62,
+        "Discord": 30
+      }
+    },
+    "World of Warcraft": {
+      "record_count": 100,
+      "avg_sentiment": -0.093,
+      "total_engagement_score": 7635,
+      "platforms": {
+        "YouTube": 8,
+        "Reddit": 58,
+        "Discord": 34
+      }
+    }
+  },
+  "by_platform": {
+    "YouTube": {
+      "record_count": 55,
+      "avg_sentiment": 0.101
+    },
+    "Reddit": {
+      "record_count": 295,
+      "avg_sentiment": 0.006
+    },
+    "Discord": {
+      "record_count": 157,
+      "avg_sentiment": 0.062
+    }
+  },
+  "weekly_volume": {
+    "PUBG": [
+      {
+        "week": "2026-06-01",
+        "count": 4,
+        "avg_sentiment": -0.167
+      },
+      {
+        "week": "2026-06-08",
+        "count": 4,
+        "avg_sentiment": -0.333
+      },
+      {
+        "week": "2026-06-15",
+        "count": 9,
+        "avg_sentiment": 0.148
+      },
+      {
+        "week": "2026-06-22",
+        "count": 5,
+        "avg_sentiment": 0.2
+      },
+      {
+        "week": "2026-06-29",
+        "count": 11,
+        "avg_sentiment": -0.06
+      },
+      {
+        "week": "2026-07-06",
+        "count": 14,
+        "avg_sentiment": -0.143
+      },
+      {
+        "week": "2026-07-13",
+        "count": 22,
+        "avg_sentiment": -0.045
+      },
+      {
+        "week": "2026-07-20",
+        "count": 8,
+        "avg_sentiment": 0.125
+      },
+      {
+        "week": "2026-07-27",
+        "count": 8,
+        "avg_sentiment": 0.125
+      }
+    ],
+    "Once Human": [
+      {
+        "week": "2026-06-01",
+        "count": 3,
+        "avg_sentiment": -0.111
+      },
+      {
+        "week": "2026-06-08",
+        "count": 7,
+        "avg_sentiment": 0.048
+      },
+      {
+        "week": "2026-06-15",
+        "count": 9,
+        "avg_sentiment": -0.185
+      },
+      {
+        "week": "2026-06-22",
+        "count": 11,
+        "avg_sentiment": -0.091
+      },
+      {
+        "week": "2026-06-29",
+        "count": 10,
+        "avg_sentiment": -0.133
+      },
+      {
+        "week": "2026-07-06",
+        "count": 10,
+        "avg_sentiment": 0.067
+      },
+      {
+        "week": "2026-07-13",
+        "count": 9,
+        "avg_sentiment": -0.148
+      },
+      {
+        "week": "2026-07-20",
+        "count": 24,
+        "avg_sentiment": 0.014
+      },
+      {
+        "week": "2026-07-27",
+        "count": 3,
+        "avg_sentiment": -0.333
+      }
+    ],
+    "Marvel Rivals": [
+      {
+        "week": "2026-06-01",
+        "count": 6,
+        "avg_sentiment": 0.611
+      },
+      {
+        "week": "2026-06-08",
+        "count": 6,
+        "avg_sentiment": 0.334
+      },
+      {
+        "week": "2026-06-15",
+        "count": 4,
+        "avg_sentiment": 0.166
+      },
+      {
+        "week": "2026-06-22",
+        "count": 13,
+        "avg_sentiment": 0.051
+      },
+      {
+        "week": "2026-06-29",
+        "count": 11,
+        "avg_sentiment": -0.03
+      },
+      {
+        "week": "2026-07-06",
+        "count": 28,
+        "avg_sentiment": 0.083
+      },
+      {
+        "week": "2026-07-13",
+        "count": 11,
+        "avg_sentiment": -0.061
+      },
+      {
+        "week": "2026-07-20",
+        "count": 9,
+        "avg_sentiment": 0.259
+      },
+      {
+        "week": "2026-07-27",
+        "count": 9,
+        "avg_sentiment": -0.148
+      }
+    ],
+    "Where Winds Meet": [
+      {
+        "week": "2026-06-01",
+        "count": 3,
+        "avg_sentiment": 0.444
+      },
+      {
+        "week": "2026-06-08",
+        "count": 5,
+        "avg_sentiment": 0.067
+      },
+      {
+        "week": "2026-06-15",
+        "count": 7,
+        "avg_sentiment": 0.476
+      },
+      {
+        "week": "2026-06-22",
+        "count": 24,
+        "avg_sentiment": 0.042
+      },
+      {
+        "week": "2026-06-29",
+        "count": 16,
+        "avg_sentiment": 0.208
+      },
+      {
+        "week": "2026-07-06",
+        "count": 12,
+        "avg_sentiment": 0.083
+      },
+      {
+        "week": "2026-07-13",
+        "count": 11,
+        "avg_sentiment": 0.152
+      },
+      {
+        "week": "2026-07-20",
+        "count": 8,
+        "avg_sentiment": 0.417
+      },
+      {
+        "week": "2026-07-27",
+        "count": 6,
+        "avg_sentiment": 0.167
+      }
+    ],
+    "World of Warcraft": [
+      {
+        "week": "2026-06-01",
+        "count": 2,
+        "avg_sentiment": 0.167
+      },
+      {
+        "week": "2026-06-08",
+        "count": 12,
+        "avg_sentiment": 0.056
+      },
+      {
+        "week": "2026-06-15",
+        "count": 9,
+        "avg_sentiment": -0.148
+      },
+      {
+        "week": "2026-06-22",
+        "count": 7,
+        "avg_sentiment": -0.143
+      },
+      {
+        "week": "2026-06-29",
+        "count": 28,
+        "avg_sentiment": -0.167
+      },
+      {
+        "week": "2026-07-06",
+        "count": 6,
+        "avg_sentiment": -0.278
+      },
+      {
+        "week": "2026-07-13",
+        "count": 13,
+        "avg_sentiment": -0.051
+      },
+      {
+        "week": "2026-07-20",
+        "count": 11,
+        "avg_sentiment": 0.0
+      },
+      {
+        "week": "2026-07-27",
+        "count": 4,
+        "avg_sentiment": 0.167
+      }
+    ]
+  },
+  "sentiment_distribution": {
+    "PUBG": {
+      "positive": 34,
+      "neutral": 30,
+      "negative": 38
+    },
+    "Once Human": {
+      "positive": 36,
+      "neutral": 20,
+      "negative": 42
+    },
+    "Marvel Rivals": {
+      "positive": 47,
+      "neutral": 29,
+      "negative": 32
+    },
+    "Where Winds Meet": {
+      "positive": 46,
+      "neutral": 31,
+      "negative": 22
+    },
+    "World of Warcraft": {
+      "positive": 21,
+      "neutral": 44,
+      "negative": 35
+    }
+  },
+  "top_themes": {
+    "PUBG": [
+      {
+        "theme": "monetization",
+        "count": 18,
+        "avg_sentiment": -0.074
+      },
+      {
+        "theme": "bug/cheating complaints",
+        "count": 17,
+        "avg_sentiment": -0.412
+      },
+      {
+        "theme": "crossover hype",
+        "count": 14,
+        "avg_sentiment": 0.285
+      },
+      {
+        "theme": "matchmaking/queue",
+        "count": 14,
+        "avg_sentiment": -0.238
+      },
+      {
+        "theme": "nostalgia",
+        "count": 12,
+        "avg_sentiment": 0.333
+      },
+      {
+        "theme": "mode feedback",
+        "count": 10,
+        "avg_sentiment": 0.233
+      }
+    ],
+    "Once Human": [
+      {
+        "theme": "monetization/gacha",
+        "count": 16,
+        "avg_sentiment": -0.541
+      },
+      {
+        "theme": "console launch anticipation",
+        "count": 16,
+        "avg_sentiment": 0.229
+      },
+      {
+        "theme": "build/base building praise",
+        "count": 15,
+        "avg_sentiment": 0.533
+      },
+      {
+        "theme": "bugs",
+        "count": 15,
+        "avg_sentiment": -0.511
+      },
+      {
+        "theme": "new content questions",
+        "count": 13,
+        "avg_sentiment": 0.231
+      },
+      {
+        "theme": "server/season fatigue",
+        "count": 11,
+        "avg_sentiment": -0.333
+      }
+    ],
+    "Marvel Rivals": [
+      {
+        "theme": "netcode/matchmaking",
+        "count": 22,
+        "avg_sentiment": -0.667
+      },
+      {
+        "theme": "comic/crossover speculation",
+        "count": 20,
+        "avg_sentiment": 0.434
+      },
+      {
+        "theme": "new character hype",
+        "count": 18,
+        "avg_sentiment": 0.574
+      },
+      {
+        "theme": "ranked complaints",
+        "count": 17,
+        "avg_sentiment": -0.157
+      },
+      {
+        "theme": "praise",
+        "count": 13,
+        "avg_sentiment": 0.743
+      },
+      {
+        "theme": "balance patch reaction",
+        "count": 7,
+        "avg_sentiment": -0.286
+      }
+    ],
+    "Where Winds Meet": [
+      {
+        "theme": "open world praise",
+        "count": 17,
+        "avg_sentiment": 0.725
+      },
+      {
+        "theme": "praise",
+        "count": 17,
+        "avg_sentiment": 0.137
+      },
+      {
+        "theme": "monetization concerns",
+        "count": 15,
+        "avg_sentiment": -0.333
+      },
+      {
+        "theme": "server queue/launch issues",
+        "count": 15,
+        "avg_sentiment": -0.155
+      },
+      {
+        "theme": "community questions",
+        "count": 14,
+        "avg_sentiment": 0.429
+      },
+      {
+        "theme": "comparisons",
+        "count": 14,
+        "avg_sentiment": 0.214
+      }
+    ],
+    "World of Warcraft": [
+      {
+        "theme": "subscription/monetization",
+        "count": 19,
+        "avg_sentiment": 0.0
+      },
+      {
+        "theme": "expansion skepticism",
+        "count": 16,
+        "avg_sentiment": -0.292
+      },
+      {
+        "theme": "nostalgia/nostalgia fatigue",
+        "count": 15,
+        "avg_sentiment": 0.0
+      },
+      {
+        "theme": "questline/story praise",
+        "count": 15,
+        "avg_sentiment": 0.578
+      },
+      {
+        "theme": "pvp season",
+        "count": 14,
+        "avg_sentiment": -0.214
+      },
+      {
+        "theme": "class balance",
+        "count": 13,
+        "avg_sentiment": -0.667
+      }
+    ]
+  },
+  "top_posts": {
+    "PUBG": [
+      {
+        "text": "Didn't expect to enjoy a superhero collab in PUBG but here we are",
+        "score": 865,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/PUBATTLEGROUNDS"
+      },
+      {
+        "text": "Didn't expect to enjoy a superhero collab in PUBG but here we are",
+        "score": 820,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/PUBATTLEGROUNDS"
+      },
+      {
+        "text": "The Spider-Man crossover skins actually look really good this time",
+        "score": 610,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/PUBATTLEGROUNDS"
+      },
+      {
+        "text": "The Spider-Man crossover skins actually look really good this time",
+        "score": 580,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/PUBATTLEGROUNDS"
+      },
+      {
+        "text": "Still can't believe this game holds up in 2026, the OG BR experience",
+        "score": 524,
+        "platform": "Reddit",
+        "sentiment_label": "neutral",
+        "source": "r/PUBATTLEGROUNDS"
+      },
+      {
+        "text": "Still can't believe this game holds up in 2026, the OG BR experience",
+        "score": 422,
+        "platform": "Reddit",
+        "sentiment_label": "neutral",
+        "source": "r/PUBATTLEGROUNDS"
+      }
+    ],
+    "Once Human": [
+      {
+        "text": "Spent 6 hours just decorating my base, this system is so addictive",
+        "score": 881,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/OnceHumanGame"
+      },
+      {
+        "text": "Base building in this game is genuinely some of the best in the genre",
+        "score": 818,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/OnceHumanGame"
+      },
+      {
+        "text": "Spent 6 hours just decorating my base, this system is so addictive",
+        "score": 800,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/OnceHumanGame"
+      },
+      {
+        "text": "Finally, console launch is confirmed, been waiting since the PC release",
+        "score": 501,
+        "platform": "Reddit",
+        "sentiment_label": "neutral",
+        "source": "r/OnceHumanGame"
+      },
+      {
+        "text": "Cash shop prices for cosmetics are honestly kind of insane for a survival game",
+        "score": 493,
+        "platform": "Reddit",
+        "sentiment_label": "negative",
+        "source": "r/OnceHumanGame"
+      },
+      {
+        "text": "Getting disconnected mid-boss fight twice this week, lost all my loot",
+        "score": 456,
+        "platform": "Reddit",
+        "sentiment_label": "negative",
+        "source": "r/OnceHumanGame"
+      }
+    ],
+    "Marvel Rivals": [
+      {
+        "text": "Best hero shooter to come out in years, the character variety is unmatched",
+        "score": 732,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/marvelrivals"
+      },
+      {
+        "text": "Best hero shooter to come out in years, the character variety is unmatched",
+        "score": 651,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/marvelrivals"
+      },
+      {
+        "text": "Season 9 roster additions are genuinely creative, love the character design work",
+        "score": 649,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/marvelrivals"
+      },
+      {
+        "text": "Rubberbanding has gotten worse since the update, unplayable in ranked",
+        "score": 488,
+        "platform": "Reddit",
+        "sentiment_label": "negative",
+        "source": "r/marvelrivals"
+      },
+      {
+        "text": "Whoever buffed that duelist needs to actually play the game before shipping changes",
+        "score": 435,
+        "platform": "Reddit",
+        "sentiment_label": "neutral",
+        "source": "r/marvelrivals"
+      },
+      {
+        "text": "One-trick counter picks are ruining competitive integrity right now",
+        "score": 369,
+        "platform": "Reddit",
+        "sentiment_label": "neutral",
+        "source": "r/marvelrivals"
+      }
+    ],
+    "Where Winds Meet": [
+      {
+        "text": "The open world design is stunning, best wuxia setting I've played in years",
+        "score": 812,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/WhereWindsMeet"
+      },
+      {
+        "text": "Genuinely surprised by how much content is here for a free-to-play title",
+        "score": 590,
+        "platform": "Reddit",
+        "sentiment_label": "neutral",
+        "source": "r/WhereWindsMeet"
+      },
+      {
+        "text": "Combat feels like a genuine mix of Sekiro and Wukong, really well done",
+        "score": 523,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/WhereWindsMeet"
+      },
+      {
+        "text": "Cosmetic gacha rates are pretty rough for a supposedly free game",
+        "score": 489,
+        "platform": "Reddit",
+        "sentiment_label": "negative",
+        "source": "r/WhereWindsMeet"
+      },
+      {
+        "text": "Battle pass FOMO is real, missed two weeks and feel behind already",
+        "score": 479,
+        "platform": "Reddit",
+        "sentiment_label": "negative",
+        "source": "r/WhereWindsMeet"
+      },
+      {
+        "text": "Queue times at peak hours are still 20+ minutes on my server",
+        "score": 452,
+        "platform": "Reddit",
+        "sentiment_label": "neutral",
+        "source": "r/WhereWindsMeet"
+      }
+    ],
+    "World of Warcraft": [
+      {
+        "text": "The new questline actually had some of the best writing in years",
+        "score": 842,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/wow"
+      },
+      {
+        "text": "Story pacing in this patch was surprisingly tight, more of this please",
+        "score": 714,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/wow"
+      },
+      {
+        "text": "This class balance pass ruined my spec, no survivability in M+ anymore",
+        "score": 468,
+        "platform": "Reddit",
+        "sentiment_label": "negative",
+        "source": "r/wow"
+      },
+      {
+        "text": "Midnight trailer didn't hype me at all, feels like more of the same systems",
+        "score": 374,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/wow"
+      },
+      {
+        "text": "The new questline actually had some of the best writing in years",
+        "score": 333,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/wow"
+      },
+      {
+        "text": "The new questline actually had some of the best writing in years",
+        "score": 329,
+        "platform": "Reddit",
+        "sentiment_label": "positive",
+        "source": "r/wow"
+      }
+    ]
+  },
+  "platform_sentiment": {
+    "YouTube": 0.101,
+    "Reddit": 0.006,
+    "Discord": 0.062
+  },
+  "recurring_questions": {
+    "PUBG": [],
+    "Once Human": [
+      {
+        "text": "Anyone know if the console version gets the same seasonal content day one?",
+        "platform": "Reddit",
+        "score": 118,
+        "source": "r/OnceHumanGame"
+      },
+      {
+        "text": "Is the mobile version worth it or does it feel like a downgrade from PC?",
+        "platform": "Reddit",
+        "score": 115,
+        "source": "r/OnceHumanGame"
+      },
+      {
+        "text": "Anyone know if the console version gets the same seasonal content day one?",
+        "platform": "Reddit",
+        "score": 35,
+        "source": "r/OnceHumanGame"
+      },
+      {
+        "text": "Is the mobile version worth it or does it feel like a downgrade from PC?",
+        "platform": "Reddit",
+        "score": 19,
+        "source": "r/OnceHumanGame"
+      },
+      {
+        "text": "Is the mobile version worth it or does it feel like a downgrade from PC?",
+        "platform": "Reddit",
+        "score": 17,
+        "source": "r/OnceHumanGame"
+      }
+    ],
+    "Marvel Rivals": [],
+    "Where Winds Meet": [
+      {
+        "text": "Anyone know the best early build for a sword-focused playstyle?",
+        "platform": "Reddit",
+        "score": 170,
+        "source": "r/WhereWindsMeet"
+      },
+      {
+        "text": "What's the fastest way to level reputation with the current faction event?",
+        "platform": "Reddit",
+        "score": 158,
+        "source": "r/WhereWindsMeet"
+      },
+      {
+        "text": "What's the fastest way to level reputation with the current faction event?",
+        "platform": "Reddit",
+        "score": 111,
+        "source": "r/WhereWindsMeet"
+      },
+      {
+        "text": "What's the fastest way to level reputation with the current faction event?",
+        "platform": "Reddit",
+        "score": 101,
+        "source": "r/WhereWindsMeet"
+      },
+      {
+        "text": "Anyone know the best early build for a sword-focused playstyle?",
+        "platform": "Reddit",
+        "score": 77,
+        "source": "r/WhereWindsMeet"
+      }
+    ],
+    "World of Warcraft": [
+      {
+        "text": "Anyone else grinding the new PvP season rewards this week?",
+        "platform": "Reddit",
+        "score": 177,
+        "source": "r/wow"
+      },
+      {
+        "text": "Anyone else grinding the new PvP season rewards this week?",
+        "platform": "Reddit",
+        "score": 67,
+        "source": "r/wow"
+      },
+      {
+        "text": "Anyone else grinding the new PvP season rewards this week?",
+        "platform": "Reddit",
+        "score": 20,
+        "source": "r/wow"
+      },
+      {
+        "text": "Anyone else grinding the new PvP season rewards this week?",
+        "platform": "Discord",
+        "score": 8,
+        "source": "WoW Community Hub"
+      },
+      {
+        "text": "Anyone else grinding the new PvP season rewards this week?",
+        "platform": "Discord",
+        "score": 7,
+        "source": "WoW Community Hub"
+      }
+    ]
+  }
+}
