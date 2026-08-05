@@ -42,3 +42,4 @@ Open this whole folder in VS Code (`File > Open Folder...`) to browse everything
 ## Data note
 
 The **live server** (`server/`) fetches real YouTube comments and stats on demand via the YouTube Data API. Reddit and Discord data is still illustrative/synthetic in both the live and static versions — see `server/README.md` section 5 for how to bring Discord live, and the report's Methodology section for why Reddit isn't yet.
+# gaming-community-pulse
