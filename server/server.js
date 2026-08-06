@@ -324,9 +324,13 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Gaming Community Pulse (live) running at http://localhost:${PORT}`);
-  if (!API_KEY) {
-    console.warn("WARNING: YOUTUBE_API_KEY is not set in server/.env — /api/analysis will return an error until it is.");
-  }
-});
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Gaming Community Pulse (live) running at http://localhost:${PORT}`);
+    if (!API_KEY) {
+      console.warn("WARNING: YOUTUBE_API_KEY is not set in server/.env — /api/analysis will return an error until it is.");
+    }
+  });
+}
