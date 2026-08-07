@@ -1,6 +1,23 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index.js" }
-  ]
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "type": "service",
+        "service": "gaming-community-pulse"
+      }
+    }
+  ],
+  "services": {
+    "gaming-community-pulse": {
+      "root": "server",
+      "entrypoint": "server.js",
+      "buildCommand": "npm install"
+    }
+  }
 }

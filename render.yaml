@@ -11,5 +11,9 @@ services:
         sync: false
       - key: DISCORD_BOT_TOKEN
         sync: false
+      - key: TWITCH_CLIENT_ID
+        sync: false
+      - key: TWITCH_CLIENT_SECRET
+        sync: false
       # PORT is injected automatically by Render — server.js already reads
       # process.env.PORT, so no PORT var needs to be set here.

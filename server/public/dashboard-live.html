@@ -185,6 +185,14 @@
     </div>
   </div>
 
+  <div class="grid2b" style="grid-template-columns: 1fr;">
+    <div class="panel">
+      <h2>Twitch — live right now</h2>
+      <p class="desc">Snapshot of current live viewers per game category, fetched fresh each refresh (not filtered by the time-range slider — this is "right now," not historical).</p>
+      <div id="twitchLiveList" class="scroll-table"></div>
+    </div>
+  </div>
+
   <div class="grid2b">
     <div class="panel">
       <h2>Engagement by game</h2>
@@ -313,6 +321,7 @@ async function loadData(force) {
       document.getElementById("dataBanner").innerHTML =
         `${dot(true)}<b>YouTube:</b> ${ds.youtube}` +
         `&nbsp;&nbsp;${dot(ds.discord.startsWith('live'))}<b>Discord:</b> ${ds.discord}` +
+        `&nbsp;&nbsp;${dot(ds.twitch && ds.twitch.startsWith('live'))}<b>Twitch:</b> ${ds.twitch || 'not configured'}` +
         `&nbsp;&nbsp;${dot(false)}<b>Reddit:</b> ${ds.reddit}`;
     }
 
@@ -597,6 +606,27 @@ function renderDataTable(){
   `).join("");
 }
 
+function renderTwitchLive(){
+  const el = document.getElementById("twitchLiveList");
+  const snapshot = (ANALYSIS && ANALYSIS.twitch_live) || [];
+  const filtered = currentGame === "All" ? snapshot : snapshot.filter(s => s.game === currentGame);
+
+  if (!filtered.length){
+    el.innerHTML = `<p style="color:var(--muted); font-size:13px;">Twitch not configured yet — add TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET to server/.env and restart the server.</p>`;
+    return;
+  }
+  el.innerHTML = filtered.map(s => `
+    <div class="video-card">
+      <span class="platform-tag">${s.game}</span>
+      <div class="post-meta">
+        <span>📡 ${s.liveChannelCount} channel${s.liveChannelCount === 1 ? '' : 's'} live</span>
+        <span>👀 ${fmtNum(s.totalLiveViewers)} viewers right now</span>
+        ${s.topStream ? `<span>Top: <a href="${s.topStream.url}" target="_blank" rel="noopener">${s.topStream.userName}</a> (${fmtNum(s.topStream.viewerCount)})</span>` : ''}
+      </div>
+    </div>
+  `).join("");
+}
+
 function renderAll(){
   buildFilterChips();
   renderRangeSlider();
@@ -608,6 +638,7 @@ function renderAll(){
   renderTopPosts();
   renderQuestions();
   renderVideosList();
+  renderTwitchLive();
   renderDataTable();
 }
 

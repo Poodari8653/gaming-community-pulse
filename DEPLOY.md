@@ -44,14 +44,19 @@ Render will prompt for the two variables marked `sync: false` in
 |---|---|
 | `YOUTUBE_API_KEY` | your key from `server/.env` locally |
 | `DISCORD_BOT_TOKEN` | your bot token from `server/.env` locally |
+| `TWITCH_CLIENT_ID` | your Client ID from `server/.env` locally |
+| `TWITCH_CLIENT_SECRET` | your Client Secret from `server/.env` locally |
 
 Don't set `PORT` — Render assigns it automatically and `server.js` already
 reads `process.env.PORT`.
 
 One more thing worth doing while you're in there: since the Discord bot
-token was pasted in this chat earlier, it's good hygiene to regenerate it
-in the [Discord Developer Portal](https://discord.com/developers/applications)
-(Bot → Reset Token) and use the new value here, rather than the original one.
+token and Twitch Client ID/Secret were pasted in this chat, it's good
+hygiene to regenerate them before or after deploying — Discord in the
+[Developer Portal](https://discord.com/developers/applications) (Bot →
+Reset Token), Twitch in the [developer console](https://dev.twitch.tv/console)
+(open the app → New Secret) — and use the fresh values here instead of the
+originals.
 
 ## 4. Deploy
 

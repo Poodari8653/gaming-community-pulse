@@ -113,9 +113,64 @@ token you shared was pasted in chat, consider regenerating it in the
 Developer Portal (Bot → Reset Token) and updating `.env` once you're done
 testing, just as good hygiene.
 
-## 7. Troubleshooting
+## 7. Twitch (live)
+
+Twitch is wired up via `lib/twitch.js`, configured in `server/config/twitch_games.json`.
+Unlike YouTube/Discord, this doesn't track one channel per game — most PUBG/WoW/
+etc. streaming happens on individual creators' channels, not a publisher's own
+Twitch presence. So instead it listens at the **category (game) level** across
+Twitch's whole directory for each title:
+
+```json
+[
+  { "game": "PUBG", "twitchCategory": "PUBG: BATTLEGROUNDS" },
+  { "game": "Once Human", "twitchCategory": "Once Human" },
+  { "game": "Marvel Rivals", "twitchCategory": "Marvel Rivals" },
+  { "game": "Where Winds Meet", "twitchCategory": "Where Winds Meet" },
+  { "game": "World of Warcraft", "twitchCategory": "World of Warcraft" }
+]
+```
+
+`twitchCategory` must match Twitch's exact category display name (visible in
+the URL slug at `twitch.tv/directory/category/<slug>` — e.g. `pubg-battlegrounds`
+→ display name `"PUBG: BATTLEGROUNDS"`).
+
+`TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET` are already set in `server/.env`,
+from a Twitch app registered at the
+[developer console](https://dev.twitch.tv/console). On each refresh, the
+server:
+
+- Gets an app access token via the Client Credentials flow (no per-user Twitch
+  login needed — cached in memory and refreshed automatically before it
+  expires, roughly every 60 days).
+- Pulls the **top clips** per category from the last 30 days (`TWITCH_CLIPS_WINDOW_DAYS`
+  in `server.js`) — clips are community-made highlights with a real title,
+  creator, view count, and creation date, which is the closest Twitch
+  equivalent to a "post" for this dataset. These feed into sentiment scoring,
+  weekly volume, top posts, etc. exactly like YouTube comments or Discord
+  messages do.
+- Pulls a **live snapshot** per category (how many channels are streaming that
+  game right now, total concurrent viewers, the top live stream) — shown in
+  the "Twitch — live right now" panel. This isn't historical text data, so it
+  isn't filtered by the time-range slider and isn't scored for sentiment.
+
+**If Twitch data doesn't show up:**
+- Confirm `twitchCategory` in `twitch_games.json` matches Twitch's category
+  name exactly (case and punctuation matter — `resolveGameId` will fail with
+  "Could not resolve Twitch category" if it doesn't).
+- Check the red error banner or `fetch_errors` in the API response — auth
+  failures (bad Client ID/Secret) show up there as `"Twitch auth failed: ..."`.
+- Since the Client ID and Secret were shared in chat, consider regenerating
+  the secret in the [developer console](https://dev.twitch.tv/console) (open
+  the app → **New Secret**) and updating `.env`, once you're done testing.
+
+To track more games, add more entries to `twitch_games.json` — no code
+changes needed.
+
+## 8. Troubleshooting
 
 - **"YOUTUBE_API_KEY is not set"** — check `server/.env` has the key on its own line with no quotes.
 - **Fetch errors for a specific game** — shown in the red banner on the dashboard; usually means comments are disabled on that video, or the video ID is wrong/removed.
 - **403 / quota errors** — you've hit the daily YouTube API quota; it resets at midnight Pacific time, or you can request a quota increase in Google Cloud Console.
 - **Port already in use** — change `PORT=3000` in `server/.env` to a free port.
+- **"Could not resolve Twitch category"** — the `twitchCategory` value in `twitch_games.json` doesn't match Twitch's exact category name; check the directory page for that game on twitch.tv.
