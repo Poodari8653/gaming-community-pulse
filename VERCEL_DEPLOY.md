@@ -1,8 +1,10 @@
 # Deploying Gaming Community Pulse to Vercel
 
-The repository is configured for Vercel: `api/index.js` re-exports the Express
-app as a serverless function, and `vercel.json` routes every request to it, so
-the dashboard at `/` and the three API endpoints all work from one function.
+The repository is configured for Vercel using the **Services** model: `vercel.json`
+declares the Express app as a single service and routes every request to it, so
+the dashboard at `/` and the three API endpoints all work from one deployment.
+See §7 for the configuration, and for the alternative if you would rather run the
+project with Framework Preset **Other**.
 
 **Read §5 first if day-over-day deltas matter to you, and §6 if cost does.**
 Vercel's serverless model has two consequences for this particular application
@@ -30,9 +32,12 @@ others.
 2. Under **Import Git Repository**, select
    **`Poodari8653/gaming-community-pulse`**.
 3. In the project setup screen:
-   - **Framework Preset**: leave as **Other** — Vercel picks up `vercel.json`.
-   - **Root Directory**: `./` (default). Do **not** set it to `server/`; the
-     function entry point is `api/index.js` at the repository root.
+   - **Framework Preset**: **Services** — the committed `vercel.json` uses the
+     services model (see §7). If you set it to **Other** instead, swap in the
+     alternative config shown in §7.
+   - **Root Directory**: `./` (default). Do **not** set it to `server/` — the
+     app reads `data/processed/` from the repository root at runtime, so the
+     build context has to include it.
 4. Expand **Environment Variables** and add the ones you need (§4).
 5. Click **Deploy**.
 
@@ -127,9 +132,9 @@ Two related things to watch:
 - **Function duration.** An uncached `/api/analysis` collects from four
   platforms and then scores every new record in batches. That is a slow request
   by serverless standards. Vercel's per-invocation timeout varies by plan; if
-  you see a timeout error on first load, either raise `maxDuration` for
-  `api/index.js` in `vercel.json` (on a plan that allows it) or reduce the
-  collection constants at the top of `server/server.js`.
+  you see a timeout error on first load, either raise `maxDuration` via the
+  service's `functions` block in `vercel.json` (on a plan that allows it) or
+  reduce the collection constants at the top of `server/server.js`.
 - **The 5-minute response cache** is also in-process, so it only helps within the
   life of one instance.
 
@@ -137,9 +142,58 @@ Two related things to watch:
 
 ## 7. What `vercel.json` does
 
+This project deploys using **[Vercel Services](https://vercel.com/docs/services)**,
+which is what its Framework Preset is set to in the Vercel dashboard. Services
+mode requires a `services` key; the deployment fails at build time with
+*"Project framework is set to `services`, but no services are declared"* if it is
+absent.
+
 ```json
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "dashboard": {
+      "root": "./",
+      "framework": "express",
+      "entrypoint": "server/server.js",
+      "installCommand": "npm install"
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": { "service": "dashboard" } }
+  ]
+}
+```
+
+- **`services.dashboard`** declares the one service this project contains: the
+  Express app.
+- **`root: "./"`** is the repository root, deliberately **not** `server/`.
+  `server/lib/dataset.js` reads `data/processed/synthetic_reddit_discord.csv`,
+  which sits outside `server/`. Rooting the service at the repository keeps that
+  file — and the rest of the tree — inside the build context, so behaviour
+  matches a local run and a Render deploy. Install therefore uses the root
+  `package.json`, which carries the same five runtime dependencies.
+- **`entrypoint`** points at the Express app. `server.js` exports the app
+  (`module.exports = app`) and only calls `listen()` when run directly, so it
+  works both as a service entrypoint and as `node server.js` locally.
+- **`rewrites`** exposes the service publicly. A service is internal by default:
+  without a top-level rewrite naming it as `destination`, it receives no traffic
+  at all.
+
+**In services mode, top-level build keys are invalid.** `functions`,
+`buildCommand`, `installCommand`, `outputDirectory` and `framework` are rejected
+at the top level, because their owner would be ambiguous across services — they
+belong inside a service object instead. An earlier version of this file used the
+non-services shape (a top-level `functions.includeFiles` plus a rewrite to
+`api/index.js`); that is the correct configuration only if the project's
+Framework Preset is **Other**.
+
+`api/index.js` is retained for that alternative: it re-exports the Express app as
+a plain serverless function. If you prefer the non-services model, change the
+Framework Preset to **Other** and use:
+
+```json
+{
   "functions": {
     "api/index.js": {
       "includeFiles": "{server/public/**,server/config/**,data/processed/**}"
@@ -149,26 +203,17 @@ Two related things to watch:
 }
 ```
 
-- **`rewrites`** sends every path to the Express app, which serves the dashboard
-  at `/`, static assets from `server/public/`, and the three API endpoints.
-- **`includeFiles`** forces three trees into the function bundle that static
-  analysis would otherwise miss, because they are read at runtime rather than
-  `require`d:
-  - `server/public/**` — the dashboard and the vendored Chart.js
-  - `server/config/**` — which channels, subreddits, Discord channels and Twitch
-    categories are tracked
-  - `data/processed/**` — the illustrative sample CSV used when `DEMO_DATA` is on
+There, `includeFiles` is required because those three trees are read at runtime
+rather than `require`d, so Vercel's static analysis does not find them on its own.
 
-  `server/lib/**` and `server/server.js` are pulled in automatically through
-  `require`.
-
-Chart.js is served from `server/public/vendor/chart.umd.min.js`, which lives in
-the repository rather than being loaded from a CDN. Nothing on the page fetches a
-third-party asset at runtime, which also means an egress-restricted network
-cannot leave the charts silently blank. Vercel builds from the repository, so the
-file has to be tracked by git — it is untracked at the time of writing, so run
-`git ls-files server/public/vendor/` and commit it if that comes back empty,
-otherwise the deployed dashboard has no charting library.
+Chart.js is served from `server/public/vendor/chart.umd.min.js`, which is
+committed to the repository rather than loaded from a CDN. Nothing on the page
+fetches a third-party asset at runtime, so an egress-restricted network cannot
+leave the charts silently blank. Because Vercel builds from the repository rather
+than your working tree, the file must be tracked — confirm with
+`git ls-files server/public/vendor/`. `server/scripts/vendor-chartjs.js` refreshes
+it from either `node_modules` location and exits cleanly if neither is present,
+falling back to the committed copy.
 
 ---
 

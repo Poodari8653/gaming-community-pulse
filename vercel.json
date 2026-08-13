@@ -1,11 +1,14 @@
 {
-  "version": 2,
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "{server/public/**,server/config/**,data/processed/**}"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "dashboard": {
+      "root": "./",
+      "framework": "express",
+      "entrypoint": "server/server.js",
+      "installCommand": "npm install"
     }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index.js" }
+    { "source": "/(.*)", "destination": { "service": "dashboard" } }
   ]
 }
