@@ -89,6 +89,9 @@ async function fetchTopClips(gameId, clientId, token, { days = 30, maxResults = 
     viewCount: Number(c.view_count || 0),
     createdAt: c.created_at,
     url: c.url,
+    // The broadcast language of the stream the clip came from — the only
+    // publication-region signal Twitch exposes at category level.
+    language: c.language || "",
   }));
 }
 
@@ -106,6 +109,7 @@ async function fetchLiveStreams(gameId, clientId, token, maxResults = 20) {
     title: s.title,
     viewerCount: Number(s.viewer_count || 0),
     startedAt: s.started_at,
+    language: s.language || "",
     url: `https://www.twitch.tv/${s.user_login}`,
   }));
 }

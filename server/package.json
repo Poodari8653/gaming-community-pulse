@@ -1,16 +1,20 @@
 {
   "name": "gaming-community-pulse-server",
-  "version": "1.0.0",
-  "description": "Local server that pulls live YouTube data (and, once configured, Discord data) for the Gaming Community Pulse dashboard.",
+  "version": "2.0.0",
+  "description": "Live server for the Gaming Community Pulse dashboard — collects public gaming discussion from YouTube, Reddit, Discord and Twitch, scores it semantically, and serves a daily marketing briefing.",
   "main": "server.js",
   "type": "commonjs",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "vendor": "node scripts/vendor-chartjs.js",
+    "postinstall": "node scripts/vendor-chartjs.js || true"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "chart.js": "^4.4.1",
     "csv-parse": "^5.5.6",
     "dotenv": "^16.4.5",
     "express": "^4.19.2"

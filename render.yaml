@@ -7,7 +7,17 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      # Semantic sentiment + AI daily briefing. Without it the tool still runs,
+      # falling back to the gaming-tuned lexicon and a computed brief.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Platform collection. Each is optional; unconfigured sources are
+      # labelled "not configured" on the dashboard rather than failing.
       - key: YOUTUBE_API_KEY
+        sync: false
+      - key: REDDIT_CLIENT_ID
+        sync: false
+      - key: REDDIT_CLIENT_SECRET
         sync: false
       - key: DISCORD_BOT_TOKEN
         sync: false
@@ -15,5 +25,13 @@ services:
         sync: false
       - key: TWITCH_CLIENT_SECRET
         sync: false
+      # Set to "false" to exclude the illustrative sample data entirely.
+      - key: DEMO_DATA
+        value: "true"
+      # Daily snapshots drive the day-over-day deltas. Render's filesystem is
+      # ephemeral on the free plan, so history resets on redeploy; attach a
+      # disk and point SNAPSHOT_DIR at it to keep trends across deploys.
+      - key: SNAPSHOT_DIR
+        value: /opt/render/project/src/data/snapshots
       # PORT is injected automatically by Render — server.js already reads
       # process.env.PORT, so no PORT var needs to be set here.

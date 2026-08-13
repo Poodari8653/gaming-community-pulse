@@ -5,3 +5,20 @@ node_modules/
 server/.DS_Store
 .vercel/
 .vercel
+
+# Client-supplied brief documents. Kept local: they carry RS's company details
+# and a named contact, which should not sit in a repository that could become
+# public. The requirements themselves are reflected in report/CLIENT_ANSWERS.md
+# and the report, which are written for sharing.
+/Requirements
+/Questionary-Requirement
+*.pdf
+
+# Runtime state, not source. Daily snapshots are what make day-over-day deltas
+# possible; they are regenerated on every refresh. Point SNAPSHOT_DIR at a
+# mounted volume in production so history survives redeploys.
+data/snapshots/
+
+# NOTE: server/public/vendor/ is deliberately NOT ignored. Chart.js is
+# committed so the dashboard renders on an egress-restricted internal network
+# with no CDN access. `npm run vendor` refreshes it from node_modules.
