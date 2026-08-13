@@ -21,10 +21,26 @@ async function discordGet(path, botToken) {
   return body;
 }
 
-/** Fetches basic channel info (name, guild it belongs to) for display/links. */
+/**
+ * Fetches basic channel info (name, guild it belongs to) for display/links,
+ * plus the guild's declared `preferred_locale` — the server's own stated
+ * locale, used as a publication-region signal (see lib/region.js). The guild
+ * lookup is best-effort: a bot without Guilds access still gets channel info.
+ */
 async function fetchChannelInfo(channelId, botToken) {
   const ch = await discordGet(`/channels/${channelId}`, botToken);
-  return { name: ch.name, guildId: ch.guild_id };
+  let guildLocale = "";
+  let guildName = "";
+  if (ch.guild_id) {
+    try {
+      const guild = await discordGet(`/guilds/${ch.guild_id}`, botToken);
+      guildLocale = guild.preferred_locale || "";
+      guildName = guild.name || "";
+    } catch (_) {
+      // Not fatal — the channel's messages are still usable without a locale.
+    }
+  }
+  return { name: ch.name, guildId: ch.guild_id, guildLocale, guildName };
 }
 
 /**

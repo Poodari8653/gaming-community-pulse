@@ -1,7 +1,9 @@
 [
   { "game": "PUBG", "twitchCategory": "PUBG: BATTLEGROUNDS" },
+  { "game": "PUBG Mobile", "twitchCategory": "PUBG MOBILE" },
   { "game": "Once Human", "twitchCategory": "Once Human" },
   { "game": "Marvel Rivals", "twitchCategory": "Marvel Rivals" },
   { "game": "Where Winds Meet", "twitchCategory": "Where Winds Meet" },
-  { "game": "World of Warcraft", "twitchCategory": "World of Warcraft" }
+  { "game": "World of Warcraft", "twitchCategory": "World of Warcraft" },
+  { "game": "Starsand Island", "twitchCategory": "Starsand Island" }
 ]

@@ -23,23 +23,38 @@ async function getJson(url) {
 
 /**
  * Resolves a channel handle (e.g. "PUBG", with or without the leading "@")
- * to its uploads playlist ID. Tries the modern @handle lookup first, then
- * falls back to the legacy username lookup for older channels.
+ * to its uploads playlist ID and publisher metadata. Tries the modern @handle
+ * lookup first, then falls back to the legacy username lookup for older
+ * channels.
+ *
+ * `snippet.country` is the channel's own declared country and is the strongest
+ * available publication-region signal (see lib/region.js) — it costs nothing
+ * extra here because `snippet` rides along on the same 1-unit call.
  */
-async function resolveUploadsPlaylistId(handle, apiKey) {
+async function resolveChannel(handle, apiKey) {
   const clean = handle.replace(/^@/, "");
 
   let body = await getJson(
-    `${BASE}/channels?part=contentDetails&forHandle=${encodeURIComponent(clean)}&key=${apiKey}`
+    `${BASE}/channels?part=contentDetails,snippet&forHandle=${encodeURIComponent(clean)}&key=${apiKey}`
   );
   if (!body.items || !body.items.length) {
     body = await getJson(
-      `${BASE}/channels?part=contentDetails&forUsername=${encodeURIComponent(clean)}&key=${apiKey}`
+      `${BASE}/channels?part=contentDetails,snippet&forUsername=${encodeURIComponent(clean)}&key=${apiKey}`
     );
   }
   const item = body.items && body.items[0];
   if (!item) throw new Error(`Could not resolve channel handle "@${clean}"`);
-  return item.contentDetails.relatedPlaylists.uploads;
+
+  return {
+    uploadsPlaylistId: item.contentDetails.relatedPlaylists.uploads,
+    country: item.snippet?.country || "",
+    channelTitle: item.snippet?.title || clean,
+  };
+}
+
+/** Back-compat wrapper for callers that only need the playlist ID. */
+async function resolveUploadsPlaylistId(handle, apiKey) {
+  return (await resolveChannel(handle, apiKey)).uploadsPlaylistId;
 }
 
 /**
@@ -66,6 +81,10 @@ async function fetchRecentVideos(playlistId, apiKey, maxResults = 10) {
     viewCount: Number(item.statistics.viewCount || 0),
     likeCount: Number(item.statistics.likeCount || 0),
     commentCount: Number(item.statistics.commentCount || 0),
+    // Publication-language signal for region classification. Falls back from
+    // the spoken audio language to the metadata language; either is a property
+    // of the upload, not of any viewer.
+    language: item.snippet.defaultAudioLanguage || item.snippet.defaultLanguage || "",
   }));
 }
 
@@ -120,4 +139,4 @@ async function fetchCommentsMerged(videoId, apiKey, maxResultsEach = 25) {
   return Array.from(byId.values());
 }
 
-module.exports = { resolveUploadsPlaylistId, fetchRecentVideos, fetchComments, fetchCommentsMerged };
+module.exports = { resolveChannel, resolveUploadsPlaylistId, fetchRecentVideos, fetchComments, fetchCommentsMerged };

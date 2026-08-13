@@ -1,16 +1,26 @@
 {
   "name": "gaming-community-pulse",
-  "version": "1.0.0",
-  "description": "Gaming Community Pulse dashboard and live analytics server",
+  "version": "2.0.0",
+  "description": "Gaming Community Pulse — a lightweight social-listening dashboard for gaming communities across YouTube, Reddit, Discord and Twitch.",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "dev": "node server/server.js"
+    "dev": "node server/server.js",
+    "postinstall": "node server/scripts/vendor-chartjs.js || true",
+    "build:docs": "node scripts/md_to_docx.js",
+    "build:docs:legacy": "node scripts/build_findings_docx.js && node scripts/build_methodology_docx.js && node scripts/build_recommendations_docx.js",
+    "build:deck": "node scripts/build_deck.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "chart.js": "^4.4.1",
     "csv-parse": "^5.5.6",
     "dotenv": "^16.4.5",
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "docx": "^8.5.0",
+    "pptxgenjs": "^3.12.0"
   },
   "engines": {
     "node": ">=18"

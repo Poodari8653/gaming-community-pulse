@@ -1,672 +1,998 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gaming Community Pulse — Live Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gaming Community Pulse — Daily Briefing</title>
+<script src="/vendor/chart.umd.min.js"></script>
 <style>
-  :root {
-    --bg: #0f1117;
-    --panel: #171a24;
-    --panel-border: #262b3a;
-    --text: #e8eaf0;
-    --muted: #9aa1b4;
-    --accent: #6c8cff;
-    --pos: #3ecf8e;
-    --neg: #ff6b6b;
-    --neu: #f5c451;
-    --radius: 10px;
+  :root{
+    --bg:#0f1117; --panel:#171a24; --panel-2:#1c202c; --border:#262b3a;
+    --text:#e8eaf0; --muted:#9aa1b4; --dim:#6f7688;
+    --accent:#6c8cff; --pos:#3ecf8e; --neg:#ff6b6b; --neu:#f5c451; --alert:#ff9f6c;
+    --radius:12px;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    background: var(--bg); color: var(--text); line-height: 1.5;
-  }
-  header {
-    padding: 28px 32px 20px; border-bottom: 1px solid var(--panel-border);
-    background: linear-gradient(180deg, #171a24, #0f1117);
-  }
-  .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-  header h1 { margin: 0 0 6px; font-size: 24px; font-weight: 700; }
-  header p.sub { margin: 0; color: var(--muted); font-size: 14px; max-width: 900px; }
-  .banner {
-    margin-top: 14px; padding: 10px 14px; border-radius: var(--radius);
-    background: #1d2333; border: 1px solid #2c3550; font-size: 13px; color: var(--muted);
-  }
-  .banner b { color: var(--text); }
-  .banner.error { background: #331d1d; border-color: #552c2c; color: #ffb3b3; }
-  .legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
-  .refresh-box { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-  .refresh-btn {
-    padding: 9px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent);
-    color: #0b0d13; font-weight: 700; font-size: 13px; cursor: pointer;
-  }
-  .refresh-btn:disabled { opacity: .6; cursor: default; }
-  .last-updated { font-size: 11.5px; color: var(--muted); }
-  main { max-width: 1280px; margin: 0 auto; padding: 24px 32px 60px; }
-  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
-  .chip {
-    padding: 7px 14px; border-radius: 999px; border: 1px solid var(--panel-border);
-    background: var(--panel); color: var(--muted); font-size: 13px; cursor: pointer;
-    transition: all .15s;
-  }
-  .chip:hover { border-color: var(--accent); color: var(--text); }
-  .chip.active { background: var(--accent); color: #0b0d13; border-color: var(--accent); font-weight: 600; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 14px; margin-bottom: 24px; }
-  .kpi { background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 16px 18px; }
-  .kpi .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-  .kpi .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
-  .kpi .value.pos { color: var(--pos); } .kpi .value.neg { color: var(--neg); }
-  .grid2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; margin-bottom: 18px; }
-  .grid2b { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
-  @media (max-width: 900px) { .grid2, .grid2b { grid-template-columns: 1fr; } }
-  .panel {
-    background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
-    padding: 18px 20px;
-  }
-  .panel h2 { margin: 0 0 4px; font-size: 15px; font-weight: 700; }
-  .panel p.desc { margin: 0 0 14px; color: var(--muted); font-size: 12.5px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--panel-border); }
-  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
-  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-  .tag.positive { background: rgba(62,207,142,.15); color: var(--pos); }
-  .tag.negative { background: rgba(255,107,107,.15); color: var(--neg); }
-  .tag.neutral { background: rgba(245,196,81,.15); color: var(--neu); }
-  .platform-tag { font-size: 11px; color: var(--muted); border: 1px solid var(--panel-border); border-radius: 6px; padding: 1px 6px; }
-  .post-card { padding: 10px 0; border-bottom: 1px solid var(--panel-border); font-size: 13.5px; }
-  .post-card:last-child { border-bottom: none; }
-  .post-meta { display: flex; gap: 8px; align-items: center; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
-  .search-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-  input[type=text], select {
-    background: #10131c; border: 1px solid var(--panel-border); color: var(--text);
-    padding: 8px 10px; border-radius: 8px; font-size: 13px;
-  }
-  .scroll-table { max-height: 360px; overflow-y: auto; }
-  footer { color: var(--muted); font-size: 12px; padding: 20px 32px 40px; border-top: 1px solid var(--panel-border); }
-  a { color: var(--accent); }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
 
-  .range-wrap { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--panel-border); }
-  .range-label-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-  .range-label-row b { color: var(--text); }
-  .range-slider { position: relative; height: 30px; }
-  .range-track-bg {
-    position: absolute; top: 13px; left: 0; right: 0; height: 4px; border-radius: 2px; background: #2a2f40;
+  a{color:var(--accent)}
+  a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{
+    outline:3px solid var(--accent); outline-offset:2px; border-radius:4px;
   }
-  .range-track-fill {
-    position: absolute; top: 13px; height: 4px; border-radius: 2px; background: var(--accent);
-  }
-  .range-slider input[type=range] {
-    position: absolute; top: 0; left: 0; width: 100%; margin: 0; pointer-events: none;
-    -webkit-appearance: none; appearance: none; background: transparent; height: 30px;
-  }
-  .range-slider input[type=range]::-webkit-slider-thumb {
-    pointer-events: all; -webkit-appearance: none; appearance: none;
-    width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
-    border: 2px solid #0b0d13; cursor: pointer; margin-top: 6px;
-  }
-  .range-slider input[type=range]::-moz-range-thumb {
-    pointer-events: all; width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
-    border: 2px solid #0b0d13; cursor: pointer;
-  }
-  .range-slider input[type=range]::-webkit-slider-runnable-track { background: transparent; }
-  .range-slider input[type=range]::-moz-range-track { background: transparent; }
-  .reset-range-btn {
-    font-size: 11.5px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0;
-    text-decoration: underline;
-  }
-  .video-card {
-    padding: 10px 0; border-bottom: 1px solid var(--panel-border); font-size: 13px;
-  }
-  .video-card:last-child { border-bottom: none; }
-  .video-card a { color: var(--text); text-decoration: none; font-weight: 600; }
-  .video-card a:hover { color: var(--accent); }
-  #loadingOverlay {
-    position: fixed; inset: 0; background: rgba(15,17,23,.85); display: flex;
-    align-items: center; justify-content: center; z-index: 999; font-size: 15px; color: var(--muted);
-  }
+  .skip-link{position:absolute;left:-9999px;top:0;background:var(--accent);color:#0b0d13;
+    padding:10px 16px;z-index:100;font-weight:700;border-radius:0 0 8px 0}
+  .skip-link:focus{left:0}
+  .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+  header.site{padding:22px 28px 16px;border-bottom:1px solid var(--border);
+    display:flex;flex-wrap:wrap;gap:16px;align-items:baseline;justify-content:space-between}
+  header.site h1{margin:0;font-size:20px;letter-spacing:-.2px}
+  header.site p{margin:4px 0 0;color:var(--muted);font-size:13px}
+  .header-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+  button{font:inherit;cursor:pointer}
+  .btn{background:var(--panel-2);color:var(--text);border:1px solid var(--border);
+    border-radius:8px;padding:8px 14px;font-size:13px}
+  .btn:hover{border-color:var(--accent)}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+  .btn-primary{background:var(--accent);color:#0b0d13;border-color:var(--accent);font-weight:600}
+
+  /* ---- Global filter bar: media channel, product/game, time range, region ---- */
+  .filterbar{position:sticky;top:0;z-index:20;background:rgba(15,17,23,.96);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:14px 28px}
+  .filter-grid{display:grid;gap:14px 26px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:start}
+  .filter-group > .filter-label{display:block;font-size:11px;text-transform:uppercase;
+    letter-spacing:.9px;color:var(--dim);margin-bottom:7px;font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--panel);color:var(--muted);border:1px solid var(--border);
+    border-radius:999px;padding:6px 13px;font-size:13px}
+  .chip:hover{border-color:var(--accent);color:var(--text)}
+  .chip[aria-pressed="true"]{background:var(--accent);color:#0b0d13;border-color:var(--accent);font-weight:600}
+  .chip .count{opacity:.65;font-size:11px;margin-left:5px}
+  select,input[type="date"],input[type="text"]{background:var(--panel);color:var(--text);
+    border:1px solid var(--border);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
+  .range-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .filter-summary{margin-top:12px;font-size:12.5px;color:var(--muted)}
+  .filter-summary b{color:var(--text)}
+
+  main{padding:22px 28px 60px;max-width:1500px;margin:0 auto}
+  .banner{border:1px solid var(--border);background:var(--panel);border-radius:10px;
+    padding:11px 15px;font-size:12.5px;color:var(--muted);margin-bottom:16px}
+  .banner.error{border-color:#5a2a2a;background:#241618;color:#ffbcbc}
+  .banner.warn{border-color:#5a4a22;background:#241f16;color:#ffdca8}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px 20px;margin-bottom:18px}
+  .panel h2{margin:0 0 4px;font-size:15px;font-weight:700}
+  .panel h3{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.7px}
+  .panel .desc{margin:0 0 14px;color:var(--muted);font-size:12.5px}
+  .grid{display:grid;gap:18px}
+  .grid-2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+  .grid-3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+
+  /* ---- Daily briefing ---- */
+  .briefing{background:linear-gradient(160deg,#1a1f2e 0%,#171a24 60%);border-color:#2e3550}
+  .briefing .headline{font-size:22px;line-height:1.35;font-weight:700;margin:2px 0 12px;letter-spacing:-.3px}
+  .briefing .narrative{font-size:15px;line-height:1.7;color:#d7dbe6;max-width:76ch;margin:0 0 6px}
+  .brief-meta{font-size:11.5px;color:var(--dim);margin-top:10px}
+  .brief-cols{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:20px}
+  .brief-col{background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:10px;padding:14px 15px}
+  .brief-item{padding:9px 0;border-bottom:1px solid var(--border)}
+  .brief-item:last-child{border-bottom:0;padding-bottom:0}
+  .brief-item .t{font-weight:600;font-size:13.5px}
+  .brief-item .d{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .sev{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.6px;
+    padding:2px 7px;border-radius:5px;font-weight:700;margin-left:6px}
+  .sev.high{background:#4a1e1e;color:#ff9d9d}
+  .sev.medium{background:#4a3a1e;color:#ffcf8f}
+  .sev.low{background:#26333f;color:#9fc6e0}
+  .empty{color:var(--dim);font-size:12.5px;font-style:italic}
+
+  /* ---- KPIs ---- */
+  .kpis{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:18px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:15px 17px}
+  .kpi .label{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.7px}
+  .kpi .value{font-size:27px;font-weight:700;margin-top:5px;letter-spacing:-.5px}
+  .kpi .sub{font-size:11.5px;color:var(--dim);margin-top:3px}
+  .pos{color:var(--pos)} .neg{color:var(--neg)} .neu{color:var(--neu)} .alert{color:var(--alert)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.6px}
+  .scroll{max-height:380px;overflow-y:auto}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600}
+  .tag.positive{background:#123527;color:var(--pos)}
+  .tag.negative{background:#3a1a1a;color:var(--neg)}
+  .tag.neutral{background:#3a331a;color:var(--neu)}
+  .pill{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 7px;white-space:nowrap}
+  .pill.sample{border-color:#5a4a22;color:#ffdca8}
+  .bar{height:6px;background:var(--panel-2);border-radius:3px;overflow:hidden;min-width:70px;margin-top:5px}
+  .bar > span{display:block;height:100%;background:var(--neg)}
+
+  .card{padding:11px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .card:last-child{border-bottom:0}
+  .card-meta{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:11.5px}
+
+  details.method{border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);padding:0;margin-bottom:18px}
+  details.method > summary{padding:16px 20px;cursor:pointer;font-weight:700;font-size:14px;list-style:none}
+  details.method > summary::-webkit-details-marker{display:none}
+  details.method > summary::before{content:"▸ ";color:var(--accent)}
+  details.method[open] > summary::before{content:"▾ "}
+  .method-body{padding:0 20px 20px}
+  .method-body h4{margin:18px 0 6px;font-size:13px}
+  .method-body p,.method-body li{font-size:13px;color:var(--muted);line-height:1.65}
+  .method-body code{background:var(--panel-2);padding:2px 6px;border-radius:4px;font-size:12px;color:#cbd3ff}
+
+  #loading{position:fixed;inset:0;background:rgba(15,17,23,.93);display:flex;
+    align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:60;font-size:14px;color:var(--muted)}
+  .spinner{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--accent);
+    border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+  footer{color:var(--dim);font-size:12px;padding:24px 28px 44px;border-top:1px solid var(--border)}
 </style>
 </head>
 <body>
 
-<div id="loadingOverlay">Fetching live YouTube data…</div>
+<a class="skip-link" href="#briefing">Skip to today's briefing</a>
 
-<header>
-  <div class="header-row">
-    <div>
-      <h1>Gaming Community Pulse — Live Dashboard</h1>
-      <p class="sub">Social listening dashboard covering public discussion of PUBG, Once Human, Marvel Rivals, Where Winds Meet, and World of Warcraft across Reddit, Discord, and YouTube.</p>
-    </div>
-    <div class="refresh-box">
-      <button class="refresh-btn" id="refreshBtn">Refresh live data</button>
-      <span class="last-updated" id="lastUpdated"></span>
-    </div>
+<div id="loading" role="status" aria-live="polite">
+  <div class="spinner" aria-hidden="true"></div>
+  <div>Collecting and scoring community data…</div>
+</div>
+
+<header class="site">
+  <div>
+    <h1>Gaming Community Pulse</h1>
+    <p>Daily briefing on public gaming discussion across YouTube, Reddit, Discord and Twitch.</p>
   </div>
-  <div class="banner" id="dataBanner">Loading data source status…</div>
-  <div class="banner error" id="errorBanner" style="display:none;"></div>
+  <div class="header-actions">
+    <span id="lastUpdated" class="pill"></span>
+    <button class="btn btn-primary" id="refreshBtn" type="button">Refresh data</button>
+  </div>
 </header>
 
-<main>
-  <div class="controls" id="gameFilter"></div>
-
-  <div class="kpis" id="kpiRow"></div>
-
-  <div class="grid2">
-    <div class="panel">
-      <h2>Weekly discussion volume</h2>
-      <p class="desc">Reddit + Discord + live YouTube volume by week — drag the handles to zoom into a time window. Every other panel below reacts to your selection.</p>
-      <canvas id="volumeChart" height="140"></canvas>
-      <div class="range-wrap">
-        <div class="range-label-row">
-          <span>Window: <b id="rangeLabel">—</b></span>
-          <button class="reset-range-btn" id="resetRangeBtn">Reset to full range</button>
-        </div>
-        <div class="range-slider">
-          <div class="range-track-bg"></div>
-          <div class="range-track-fill" id="rangeTrackFill"></div>
-          <input type="range" id="rangeStartInput" min="0" max="1" value="0" step="1">
-          <input type="range" id="rangeEndInput" min="0" max="1" value="1" step="1">
-        </div>
+<!-- =====================  GLOBAL FILTERS  ===================== -->
+<section class="filterbar" aria-label="Global dashboard filters">
+  <div class="filter-grid">
+    <div class="filter-group">
+      <span class="filter-label" id="lbl-channel">Media channel</span>
+      <div class="chips" id="channelFilter" role="group" aria-labelledby="lbl-channel"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label" id="lbl-game">Product / game</span>
+      <div class="chips" id="gameFilter" role="group" aria-labelledby="lbl-game"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label" id="lbl-range">Time range</span>
+      <div class="range-row" role="group" aria-labelledby="lbl-range">
+        <div class="chips" id="rangeFilter"></div>
+        <label class="visually-hidden" for="rangeFrom">Custom start date</label>
+        <input type="date" id="rangeFrom">
+        <span aria-hidden="true" style="color:var(--dim)">→</span>
+        <label class="visually-hidden" for="rangeTo">Custom end date</label>
+        <input type="date" id="rangeTo">
       </div>
     </div>
-    <div class="panel">
-      <h2>Sentiment mix</h2>
-      <p class="desc">Share of positive / neutral / negative discussion, all platforms combined, in the selected window.</p>
-      <canvas id="sentimentChart" height="140"></canvas>
+    <div class="filter-group">
+      <label class="filter-label" for="regionFilter">Publication region</label>
+      <select id="regionFilter"><option value="">All regions</option></select>
     </div>
   </div>
+  <p class="filter-summary" id="filterSummary" aria-live="polite"></p>
+</section>
 
-  <div class="grid2b" style="grid-template-columns: 1fr;">
-    <div class="panel">
-      <h2>Videos in this window</h2>
-      <p class="desc">The actual YouTube videos (from each game's channel) whose publish date falls inside your selected time window.</p>
-      <div id="videosList" class="scroll-table"></div>
-    </div>
+<main>
+  <div class="banner" id="sourceBanner">Loading data-source status…</div>
+  <div class="banner warn" id="provenanceBanner" style="display:none"></div>
+  <div class="banner error" id="errorBanner" style="display:none" role="alert"></div>
+
+  <!-- =====================  DAILY BRIEFING  ===================== -->
+  <section class="panel briefing" id="briefing" aria-labelledby="briefing-h">
+    <h2 id="briefing-h">Today's briefing</h2>
+    <p class="desc">Written from the filtered data below. This is the one-minute read; everything under it is the evidence.</p>
+    <div id="briefingBody" aria-live="polite"></div>
+  </section>
+
+  <h2 class="visually-hidden">Headline metrics</h2>
+  <div class="kpis" id="kpiRow" aria-live="polite"></div>
+
+  <div class="grid grid-2">
+    <section class="panel" aria-labelledby="vol-h">
+      <h2 id="vol-h">Discussion volume &amp; sentiment over time</h2>
+      <p class="desc">Volume bars with mean sentiment overlaid. Statistically detected spikes are listed underneath.</p>
+      <canvas id="volumeChart" height="150" role="img" aria-label="Discussion volume and mean sentiment over the selected time range"></canvas>
+      <div id="volumeTable" class="visually-hidden"></div>
+      <div id="spikeList" style="margin-top:12px"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="sent-h">
+      <h2 id="sent-h">Sentiment mix by game</h2>
+      <p class="desc">Share of positive, neutral and negative records. Sentiment runs from −100 to +100.</p>
+      <canvas id="sentimentChart" height="150" role="img" aria-label="Sentiment mix by game"></canvas>
+      <div id="sentimentTable" class="visually-hidden"></div>
+    </section>
   </div>
 
-  <div class="grid2b" style="grid-template-columns: 1fr;">
-    <div class="panel">
-      <h2>Twitch — live right now</h2>
-      <p class="desc">Snapshot of current live viewers per game category, fetched fresh each refresh (not filtered by the time-range slider — this is "right now," not historical).</p>
-      <div id="twitchLiveList" class="scroll-table"></div>
-    </div>
+  <div class="grid grid-2">
+    <section class="panel" aria-labelledby="eng-h">
+      <h2 id="eng-h">Engagement Index by game</h2>
+      <p class="desc">Mean index, 0–100, normalised per platform so games are genuinely comparable. See the methodology panel for the formula.</p>
+      <canvas id="engagementChart" height="160" role="img" aria-label="Mean Engagement Index by game"></canvas>
+      <div id="engagementTable" class="visually-hidden"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="plat-h">
+      <h2 id="plat-h">How the channels differ</h2>
+      <p class="desc">Same five titles, four platforms — tone and intensity are not the same on each.</p>
+      <div class="scroll">
+        <table id="platformTable">
+          <caption class="visually-hidden">Record count, mean sentiment and mean Engagement Index per media channel</caption>
+          <thead><tr><th scope="col">Channel</th><th scope="col">Records</th><th scope="col">Sentiment</th><th scope="col">Engagement</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
-  <div class="grid2b">
-    <div class="panel">
-      <h2>Engagement by game</h2>
-      <p class="desc">Total upvotes / likes / reactions across all collected records.</p>
-      <canvas id="engagementChart" height="160"></canvas>
-    </div>
-    <div class="panel">
-      <h2>Recurring themes</h2>
-      <p class="desc">Most common discussion themes and their average sentiment (Reddit + Discord sample).</p>
-      <div class="scroll-table"><table id="themeTable"><thead><tr><th>Theme</th><th>Mentions</th><th>Sentiment</th></tr></thead><tbody></tbody></table></div>
-    </div>
+  <div class="grid grid-2">
+    <section class="panel" aria-labelledby="theme-h">
+      <h2 id="theme-h">Recurring themes</h2>
+      <p class="desc">Assigned by semantic analysis from a controlled vocabulary, so themes aggregate across all four channels.</p>
+      <div class="scroll">
+        <table id="themeTable">
+          <caption class="visually-hidden">Themes by mention count, mean sentiment and negative share</caption>
+          <thead><tr><th scope="col">Theme</th><th scope="col">Mentions</th><th scope="col">Sentiment</th><th scope="col">Negative share</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="region-h">
+      <h2 id="region-h">Publication region</h2>
+      <p class="desc">The region content was <em>published</em> in — never the location of individual commenters.</p>
+      <div class="scroll">
+        <table id="regionTable">
+          <caption class="visually-hidden">Records, sentiment and engagement by publication region</caption>
+          <thead><tr><th scope="col">Region</th><th scope="col">Records</th><th scope="col">Sentiment</th><th scope="col">Engagement</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="desc" style="margin-top:10px;margin-bottom:0" id="regionNote"></p>
+    </section>
   </div>
 
-  <div class="grid2">
-    <div class="panel">
-      <h2>Top posts &amp; comments</h2>
-      <p class="desc">Most-liked / most-viral comments in the current selection, ranked by like count (each video's comments are pulled both by recency and by YouTube's own "top comments" ranking, so a viral old comment won't be missed).</p>
-      <div id="topPosts"></div>
-    </div>
-    <div class="panel">
-      <h2>Recurring questions</h2>
-      <p class="desc">Community questions worth a FAQ, patch note, or creator briefing.</p>
+  <div class="grid grid-2">
+    <section class="panel" aria-labelledby="q-h">
+      <h2 id="q-h">Recurring questions</h2>
+      <p class="desc">Clustered by topic — "asked N×" counts how many separate people asked the same thing. A ready-made content shortlist.</p>
       <div id="questionsList"></div>
-    </div>
+    </section>
+
+    <section class="panel" aria-labelledby="top-h">
+      <h2 id="top-h">Highest-impact posts</h2>
+      <p class="desc">Ranked by Engagement Index, so a viral Discord message can outrank a mid-tier Twitch clip.</p>
+      <div id="topPosts"></div>
+    </section>
   </div>
 
-  <div class="panel">
-    <h2>Browse raw data</h2>
-    <p class="desc">Search across all records (live YouTube + illustrative Reddit/Discord samples).</p>
-    <div class="search-row">
-      <input type="text" id="searchBox" placeholder="Search text..." style="flex:1; min-width:220px;">
-      <select id="platformFilter">
-        <option value="">All platforms</option>
-        <option value="Reddit">Reddit</option>
-        <option value="Discord">Discord</option>
-        <option value="YouTube">YouTube</option>
-      </select>
+  <section class="panel" id="twitchPanel" aria-labelledby="twitch-h">
+    <h2 id="twitch-h">Twitch — live right now</h2>
+    <p class="desc">A point-in-time viewer snapshot per category. It responds to the media-channel and game filters; the time-range and region filters do not apply, because a "right now" figure has no history to filter.</p>
+    <div id="twitchLive"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="raw-h">
+    <h2 id="raw-h">Browse the underlying records</h2>
+    <p class="desc">Every figure above traces back to rows here. Sample rows are tagged.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <label class="visually-hidden" for="searchBox">Search record text</label>
+      <input type="text" id="searchBox" placeholder="Search text…" style="flex:1;min-width:220px">
+      <label class="visually-hidden" for="sentimentFilter">Filter by sentiment</label>
       <select id="sentimentFilter">
         <option value="">All sentiment</option>
         <option value="positive">Positive</option>
         <option value="neutral">Neutral</option>
         <option value="negative">Negative</option>
       </select>
+      <label class="visually-hidden" for="provenanceFilter">Filter by provenance</label>
+      <select id="provenanceFilter">
+        <option value="">All records</option>
+        <option value="collected">Collected only</option>
+        <option value="sample">Sample only</option>
+      </select>
     </div>
-    <div class="scroll-table">
+    <div class="scroll">
       <table id="dataTable">
-        <thead><tr><th>Game</th><th>Platform</th><th>Type</th><th>Text</th><th>Score</th><th>Sentiment</th></tr></thead>
+        <caption class="visually-hidden">Individual collected and sample records</caption>
+        <thead><tr>
+          <th scope="col">Game</th><th scope="col">Channel</th><th scope="col">Text</th>
+          <th scope="col">Theme</th><th scope="col">Sentiment</th><th scope="col">Engagement</th>
+        </tr></thead>
         <tbody></tbody>
       </table>
     </div>
-  </div>
+    <p class="desc" id="rawCount" style="margin:10px 0 0"></p>
+  </section>
+
+  <details class="method">
+    <summary>How every number on this page is calculated</summary>
+    <div class="method-body" id="methodBody">Loading methodology…</div>
+  </details>
 </main>
 
 <footer>
-  Live prototype. YouTube comment data is fetched live via the YouTube Data API on each load/refresh; Reddit and Discord data is clearly-labeled illustrative sample data until API/bot access is configured. See report/GAMING_COMMUNITY_PULSE_REPORT.md for full methodology.
+  Gaming Community Pulse — a lightweight social-listening prototype built for Ruisheng Holdings.
+  Public data only, collected via official platform APIs. See <code>report/</code> for the full findings,
+  methodology and recommendations.
 </footer>
 
 <script>
-let ANALYSIS = null;
+"use strict";
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let DATA = null;
 let RECORDS = [];
-let VIDEOS = [];
-let GAMES = [];
-let currentGame = "All";
+const filters = {
+  channels: new Set(),   // empty = all
+  games: new Set(),      // empty = all
+  region: "",
+  preset: "30d",
+  from: null,
+  to: null,
+};
+const charts = {};
+const COLORS = ["#6c8cff","#3ecf8e","#f5c451","#ff6b6b","#b98cff","#4dd0e1","#ff9f6c"];
+const PRESETS = [
+  { id:"1d", label:"Today", days:1 },
+  { id:"7d", label:"7 days", days:7 },
+  { id:"30d", label:"30 days", days:30 },
+  { id:"90d", label:"90 days", days:90 },
+  { id:"all", label:"All", days:null },
+];
 
-let ALL_WEEKS = [];       // sorted list of unique week-start strings across all games
-let rangeStartIdx = 0;
-let rangeEndIdx = 0;
+// ---------------------------------------------------------------------------
+// Helpers — every string that reaches innerHTML goes through esc()
+// ---------------------------------------------------------------------------
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function num(n){ return (Number(n)||0).toLocaleString(); }
+function signed(n){ const v = Math.round(Number(n)||0); return (v>0?"+":"") + v; }
+function sentClass(v){ return v > 15 ? "pos" : v < -15 ? "neg" : "neu"; }
+function dayOf(ts){ const d = new Date(ts); return isNaN(d) ? null : d.toISOString().slice(0,10); }
 
-const COLORS = ["#6c8cff", "#3ecf8e", "#f5c451", "#ff6b6b", "#b98cff", "#4dd0e1", "#ff9f6c"];
-let gameColor = {};
+// ---------------------------------------------------------------------------
+// Filtering — the single source of truth every panel reads from
+// ---------------------------------------------------------------------------
+function activeWindow(){
+  if (filters.from && filters.to) return { from: filters.from, to: filters.to };
+  const preset = PRESETS.find(p => p.id === filters.preset);
+  if (!preset || preset.days === null) return { from: null, to: null };
 
-function fmtNum(n){ return n.toLocaleString(); }
-
-// Mirrors server.js's isoWeekStart so client-side range filtering buckets
-// records into the exact same weeks shown in the volume chart.
-function isoWeekStart(dateStr){
-  const d = new Date(dateStr);
-  const day = (d.getUTCDay() + 6) % 7; // Monday = 0
-  d.setUTCDate(d.getUTCDate() - day);
-  d.setUTCHours(0,0,0,0);
-  return d.toISOString().slice(0,10);
+  // Anchor to the newest record rather than the wall clock: the sample data
+  // sits in a fixed historical window, so anchoring to "now" would show an
+  // empty dashboard on first load.
+  let newest = null;
+  for (const r of RECORDS){
+    const d = dayOf(r.timestamp);
+    if (d && (!newest || d > newest)) newest = d;
+  }
+  if (!newest) return { from: null, to: null };
+  const end = new Date(newest + "T00:00:00Z");
+  const start = new Date(end.getTime() - (preset.days - 1) * 86400000);
+  return { from: start.toISOString().slice(0,10), to: newest };
 }
 
-const DEFAULT_VISIBLE_WEEKS = 8; // on load, zoom to the most recent N weeks instead of full history
-
-function computeAllWeeks(){
-  const set = new Set();
-  GAMES.forEach(g => (ANALYSIS.weekly_volume[g] || []).forEach(w => set.add(w.week)));
-  ALL_WEEKS = Array.from(set).sort();
-  // Default view: the most recent DEFAULT_VISIBLE_WEEKS weeks. Live YouTube
-  // comments can trail back much further than the synthetic sample's 8-week
-  // window (whenever a channel's older tracked videos were posted), which
-  // would otherwise open on a long, sparse, near-flat stretch by default.
-  // Drag the left handle to go further back — nothing is hidden, just not
-  // shown by default.
-  rangeEndIdx = Math.max(0, ALL_WEEKS.length - 1);
-  rangeStartIdx = Math.max(0, ALL_WEEKS.length - DEFAULT_VISIBLE_WEEKS);
+function filtered(){
+  const w = activeWindow();
+  return RECORDS.filter(r => {
+    if (filters.channels.size && !filters.channels.has(r.platform)) return false;
+    if (filters.games.size && !filters.games.has(r.game)) return false;
+    if (filters.region && r.region !== filters.region) return false;
+    if (w.from || w.to){
+      const d = dayOf(r.timestamp);
+      if (!d) return false;
+      if (w.from && d < w.from) return false;
+      if (w.to && d > w.to) return false;
+    }
+    return true;
+  });
 }
 
-function inSelectedRange(timestamp){
-  if (!ALL_WEEKS.length) return true;
-  const wk = isoWeekStart(timestamp);
-  return wk >= ALL_WEEKS[rangeStartIdx] && wk <= ALL_WEEKS[rangeEndIdx];
+// ---------------------------------------------------------------------------
+// Aggregation (client-side, so all three filters drive every panel instantly)
+// ---------------------------------------------------------------------------
+function summarise(rows){
+  if (!rows.length) return { count:0, sentiment:0, engagement:0, positive:0, neutral:0, negative:0 };
+  let s=0,e=0,p=0,n=0,g=0;
+  for (const r of rows){
+    s += r.sentiment_score; e += r.engagement_index;
+    if (r.sentiment_label === "positive") p++;
+    else if (r.sentiment_label === "negative") g++;
+    else n++;
+  }
+  return { count:rows.length, sentiment:Math.round(s/rows.length),
+    engagement:Math.round((e/rows.length)*10)/10, positive:p, neutral:n, negative:g };
 }
 
-async function loadData(force) {
-  document.getElementById("loadingOverlay").style.display = "flex";
+function seriesFor(rows, granularity){
+  const buckets = new Map();
+  for (const r of rows){
+    const d = dayOf(r.timestamp);
+    if (!d) continue;
+    let key = d;
+    if (granularity === "week"){
+      const dt = new Date(d + "T00:00:00Z");
+      dt.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7));
+      key = dt.toISOString().slice(0,10);
+    }
+    if (!buckets.has(key)) buckets.set(key, { key, count:0, sum:0 });
+    const b = buckets.get(key); b.count++; b.sum += r.sentiment_score;
+  }
+  return [...buckets.values()].sort((a,b)=>a.key<b.key?-1:1)
+    .map(b => ({ key:b.key, count:b.count, sentiment:Math.round(b.sum/b.count) }));
+}
+
+function detectSpikes(series){
+  const out = [];
+  for (let i=1;i<series.length;i++){
+    const prior = series.slice(Math.max(0,i-6), i);
+    if (prior.length < 2) continue;
+    const counts = prior.map(p=>p.count);
+    const mean = counts.reduce((a,c)=>a+c,0)/counts.length;
+    const sd = Math.sqrt(counts.reduce((a,c)=>a+(c-mean)**2,0)/counts.length);
+    const pt = series[i];
+    if (pt.count < 3) continue;
+    if (sd === 0){ if (pt.count >= mean*2) out.push({...pt, mean, multiple:mean?pt.count/mean:null}); continue; }
+    const z = (pt.count-mean)/sd;
+    if (z >= 2 && pt.count >= mean*1.5) out.push({...pt, mean, z, multiple:pt.count/mean});
+  }
+  return out;
+}
+
+function themesFor(rows){
+  const agg = new Map();
+  for (const r of rows){
+    if (!r.theme) continue;
+    if (!agg.has(r.theme)) agg.set(r.theme, { theme:r.theme, count:0, sum:0, neg:0 });
+    const t = agg.get(r.theme); t.count++; t.sum += r.sentiment_score;
+    if (r.sentiment_label === "negative") t.neg++;
+  }
+  return [...agg.values()].filter(t=>t.count>=2)
+    .map(t=>({ theme:t.theme, count:t.count, sentiment:Math.round(t.sum/t.count),
+      negShare:Math.round((t.neg/t.count)*100) }))
+    .sort((a,b)=>b.count-a.count).slice(0,12);
+}
+
+const STOP = new Set("the a an is are was were be to of and or but in on at for with about as by from it its this that these those i you we they my your our their do does did can could would should will get got any anyone someone how what why when where which who there here just still even also so if not no yes have has had am im ive dont".split(" "));
+function tokens(t){
+  return new Set(String(t||"").toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/)
+    .filter(w=>w.length>2 && !STOP.has(w)));
+}
+function clusterQuestions(rows){
+  const qs = rows.filter(r=>r.is_question && r.text && r.text.length>12);
+  const clusters = [];
+  for (const q of qs){
+    const tk = tokens(q.text);
+    if (tk.size < 2) continue;
+    let placed = false;
+    for (const c of clusters){
+      let shared = 0; for (const x of tk) if (c.tokens.has(x)) shared++;
+      const j = shared / (tk.size + c.tokens.size - shared);
+      if (j >= 0.4){ c.members.push(q); for (const x of tk) c.tokens.add(x); placed = true; break; }
+    }
+    if (!placed) clusters.push({ tokens:tk, members:[q] });
+  }
+  return clusters.map(c=>{
+    const best = [...c.members].sort((a,b)=>b.engagement_index-a.engagement_index)[0];
+    return { question:best.text.slice(0,220), asked:c.members.length,
+      games:[...new Set(c.members.map(m=>m.game))], platforms:[...new Set(c.members.map(m=>m.platform))],
+      url:best.url||"" };
+  }).sort((a,b)=>b.asked-a.asked).slice(0,8);
+}
+
+// ---------------------------------------------------------------------------
+// Filter UI
+// ---------------------------------------------------------------------------
+function chip(label, pressed, count){
+  return '<button type="button" class="chip" aria-pressed="' + (pressed?"true":"false") +
+    '" data-value="' + esc(label) + '">' + esc(label) +
+    (count != null ? '<span class="count">' + num(count) + '</span>' : '') + '</button>';
+}
+
+function buildFilters(){
+  const counts = {};
+  for (const r of RECORDS){ counts[r.platform] = (counts[r.platform]||0)+1; }
+  const chEl = document.getElementById("channelFilter");
+  chEl.innerHTML = '<button type="button" class="chip" aria-pressed="' + (filters.channels.size===0) +
+    '" data-value="__all">All channels</button>' +
+    (DATA.platforms||[]).filter(p=>counts[p]).map(p=>chip(p, filters.channels.has(p), counts[p])).join("");
+  chEl.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+    const v = b.dataset.value;
+    if (v === "__all") filters.channels.clear();
+    else { filters.channels.has(v) ? filters.channels.delete(v) : filters.channels.add(v); }
+    render();
+  }));
+
+  const gCounts = {};
+  for (const r of RECORDS){ gCounts[r.game] = (gCounts[r.game]||0)+1; }
+  const gEl = document.getElementById("gameFilter");
+  gEl.innerHTML = '<button type="button" class="chip" aria-pressed="' + (filters.games.size===0) +
+    '" data-value="__all">All games</button>' +
+    (DATA.games||[]).filter(g=>gCounts[g]).map(g=>chip(g, filters.games.has(g), gCounts[g])).join("");
+  gEl.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+    const v = b.dataset.value;
+    if (v === "__all") filters.games.clear();
+    else { filters.games.has(v) ? filters.games.delete(v) : filters.games.add(v); }
+    render();
+  }));
+
+  const rEl = document.getElementById("rangeFilter");
+  rEl.innerHTML = PRESETS.map(p =>
+    '<button type="button" class="chip" aria-pressed="' +
+    (!filters.from && filters.preset===p.id) + '" data-value="' + p.id + '">' + esc(p.label) + '</button>').join("");
+  rEl.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+    filters.preset = b.dataset.value; filters.from = null; filters.to = null;
+    document.getElementById("rangeFrom").value = "";
+    document.getElementById("rangeTo").value = "";
+    render();
+  }));
+
+  const regions = [...new Set(RECORDS.map(r=>r.region))].sort();
+  const regEl = document.getElementById("regionFilter");
+  regEl.innerHTML = '<option value="">All regions</option>' +
+    regions.map(r=>'<option value="'+esc(r)+'"'+(filters.region===r?" selected":"")+'>'+esc(r)+'</option>').join("");
+}
+
+// ---------------------------------------------------------------------------
+// Renderers
+// ---------------------------------------------------------------------------
+function renderBriefing(rows){
+  const b = DATA.briefing || {};
+  const el = document.getElementById("briefingBody");
+  // The notice must also fire when a time-range preset narrows the view. The
+  // default preset is 30 days, so checking only for a custom date would leave
+  // every panel showing a narrower window than the briefing, silently.
+  const isFiltered = filters.channels.size || filters.games.size || filters.region ||
+    filters.from || rows.length < RECORDS.length;
+
+  let html = "";
+  if (isFiltered){
+    html += '<div class="banner" style="margin-bottom:14px">The briefing below was written from the <b>full</b> dataset. ' +
+      'Your filters are applied to every panel underneath it.</div>';
+  }
+  html += '<p class="headline">' + esc(b.headline || "Daily community snapshot") + '</p>';
+  html += '<p class="narrative">' + esc(b.narrative || "No briefing available.") + '</p>';
+
+  const col = (title, items, renderer) =>
+    '<div class="brief-col"><h3>' + esc(title) + '</h3>' +
+    (items && items.length ? items.map(renderer).join("") : '<p class="empty">Nothing flagged.</p>') + '</div>';
+
+  html += '<div class="brief-cols">';
+  html += col("Watch today", b.watch_today, i =>
+    '<div class="brief-item"><div class="t">' + esc(i.title) + ' <span class="pill">' + esc(i.game) + '</span></div>' +
+    '<div class="d">' + esc(i.detail) + '</div></div>');
+  html += col("Community risks", b.risks, i =>
+    '<div class="brief-item"><div class="t">' + esc(i.title) +
+    '<span class="sev ' + esc(i.severity) + '">' + esc(i.severity) + '</span></div>' +
+    '<div class="d">' + esc(i.detail) + ' — ' + esc(i.game) + '</div></div>');
+  html += col("Campaign opportunities", b.opportunities, i =>
+    '<div class="brief-item"><div class="t">' + esc(i.title) + ' <span class="pill">' + esc(i.game) + '</span></div>' +
+    '<div class="d">' + esc(i.detail) + '</div></div>');
+  html += col("Changed since last snapshot",
+    (b.changes_vs_previous && b.changes_vs_previous.length) ? b.changes_vs_previous : null,
+    i => '<div class="brief-item"><div class="d">' + esc(i) + '</div></div>');
+  html += '</div>';
+
+  const wc = b.word_count ? b.word_count + " words" : null;
+  html += '<p class="brief-meta">Generated by ' + esc(b.generated_by || "unknown") +
+    (wc ? " · " + esc(wc) : "") +
+    (b.word_count_guidance ? " · target " + esc(b.word_count_guidance.min + "–" + b.word_count_guidance.max) + " words" : "") +
+    (b.fallback_reason ? " · " + esc(b.fallback_reason) : "") + '</p>';
+
+  el.innerHTML = html;
+}
+
+function renderKPIs(rows){
+  const s = summarise(rows);
+  const collected = rows.filter(r=>!r.is_sample).length;
+  const risks = rows.filter(r=>r.is_risk).length;
+  const kpis = [
+    { label:"Records in view", value:num(s.count), sub:collected + " collected · " + (s.count-collected) + " sample" },
+    { label:"Mean sentiment", value:signed(s.sentiment), cls:sentClass(s.sentiment), sub:"scale −100 to +100" },
+    { label:"Engagement Index", value:s.engagement.toFixed(1), sub:"0–100, normalised per channel" },
+    { label:"Risk signals", value:num(risks), cls:risks?"alert":"", sub:risks?"flagged for escalation":"none flagged" },
+    { label:"Negative share", value:(s.count?Math.round(s.negative/s.count*100):0) + "%", cls:"neg", sub:s.negative + " of " + s.count + " records" },
+  ];
+  document.getElementById("kpiRow").innerHTML = kpis.map(k =>
+    '<div class="kpi"><div class="label">' + esc(k.label) + '</div>' +
+    '<div class="value ' + esc(k.cls||"") + '">' + esc(k.value) + '</div>' +
+    '<div class="sub">' + esc(k.sub) + '</div></div>').join("");
+}
+
+function renderVolume(rows){
+  const w = activeWindow();
+  const spanDays = (w.from && w.to)
+    ? (new Date(w.to) - new Date(w.from)) / 86400000
+    : 999;
+  const granularity = spanDays > 70 ? "week" : "day";
+  const series = seriesFor(rows, granularity);
+  const spikes = detectSpikes(series);
+  const spikeKeys = new Set(spikes.map(s=>s.key));
+
+  if (charts.volume) charts.volume.destroy();
+  charts.volume = new Chart(document.getElementById("volumeChart"), {
+    data:{
+      labels: series.map(s=>s.key),
+      datasets:[
+        { type:"bar", label:"Records", data:series.map(s=>s.count), yAxisID:"y",
+          backgroundColor: series.map(s => spikeKeys.has(s.key) ? "#ff9f6c" : "#6c8cff88"),
+          borderColor: series.map(s => spikeKeys.has(s.key) ? "#ff9f6c" : "#6c8cff"), borderWidth:1 },
+        { type:"line", label:"Mean sentiment", data:series.map(s=>s.sentiment), yAxisID:"y1",
+          borderColor:"#3ecf8e", backgroundColor:"#3ecf8e", tension:.3, pointRadius:2, fill:false },
+      ]
+    },
+    options:{ responsive:true, interaction:{mode:"index",intersect:false},
+      plugins:{ legend:{labels:{color:"#9aa1b4"}} },
+      scales:{
+        x:{ ticks:{color:"#9aa1b4",maxTicksLimit:12}, grid:{color:"#262b3a"} },
+        y:{ position:"left", beginAtZero:true, ticks:{color:"#9aa1b4"}, grid:{color:"#262b3a"},
+            title:{display:true,text:"Records",color:"#6f7688"} },
+        y1:{ position:"right", min:-100, max:100, ticks:{color:"#9aa1b4"}, grid:{display:false},
+            title:{display:true,text:"Sentiment",color:"#6f7688"} },
+      } }
+  });
+
+  // Text equivalent for screen readers and for anyone the canvas fails for.
+  document.getElementById("volumeTable").innerHTML =
+    '<table><caption>Discussion volume and mean sentiment per ' + granularity + '</caption>' +
+    '<thead><tr><th scope="col">Period</th><th scope="col">Records</th><th scope="col">Mean sentiment</th></tr></thead><tbody>' +
+    series.map(s=>'<tr><td>'+esc(s.key)+'</td><td>'+s.count+'</td><td>'+signed(s.sentiment)+'</td></tr>').join("") +
+    '</tbody></table>';
+
+  document.getElementById("spikeList").innerHTML = spikes.length
+    ? '<h3>Detected spikes</h3>' + spikes.map(s =>
+        '<div class="card"><b>' + esc(s.key) + '</b> — ' + s.count + ' records, ' +
+        (s.multiple ? esc(s.multiple.toFixed(1)) + '× the trailing baseline' : 'well above baseline') +
+        ' (mean sentiment ' + signed(s.sentiment) + ')</div>').join("")
+    : '<p class="empty">No statistically significant volume spikes in this window.</p>';
+}
+
+function renderSentimentChart(rows){
+  const games = [...new Set(rows.map(r=>r.game))].sort();
+  const pos=[],neu=[],neg=[];
+  for (const g of games){
+    const gr = rows.filter(r=>r.game===g);
+    pos.push(gr.filter(r=>r.sentiment_label==="positive").length);
+    neu.push(gr.filter(r=>r.sentiment_label==="neutral").length);
+    neg.push(gr.filter(r=>r.sentiment_label==="negative").length);
+  }
+  if (charts.sentiment) charts.sentiment.destroy();
+  charts.sentiment = new Chart(document.getElementById("sentimentChart"), {
+    type:"bar",
+    data:{ labels:games, datasets:[
+      { label:"Positive", data:pos, backgroundColor:"#3ecf8e" },
+      { label:"Neutral", data:neu, backgroundColor:"#f5c451" },
+      { label:"Negative", data:neg, backgroundColor:"#ff6b6b" }]},
+    options:{ responsive:true, plugins:{legend:{labels:{color:"#9aa1b4"}}},
+      scales:{ x:{stacked:true,ticks:{color:"#9aa1b4"},grid:{display:false}},
+               y:{stacked:true,ticks:{color:"#9aa1b4"},grid:{color:"#262b3a"}} } }
+  });
+  document.getElementById("sentimentTable").innerHTML =
+    '<table><caption>Sentiment mix by game</caption><thead><tr><th scope="col">Game</th>' +
+    '<th scope="col">Positive</th><th scope="col">Neutral</th><th scope="col">Negative</th></tr></thead><tbody>' +
+    games.map((g,i)=>'<tr><td>'+esc(g)+'</td><td>'+pos[i]+'</td><td>'+neu[i]+'</td><td>'+neg[i]+'</td></tr>').join("") +
+    '</tbody></table>';
+}
+
+function renderEngagementChart(rows){
+  const games = [...new Set(rows.map(r=>r.game))].sort();
+  const values = games.map(g => summarise(rows.filter(r=>r.game===g)).engagement);
+  if (charts.engagement) charts.engagement.destroy();
+  charts.engagement = new Chart(document.getElementById("engagementChart"), {
+    type:"bar",
+    data:{ labels:games, datasets:[{ label:"Mean Engagement Index", data:values,
+      backgroundColor: games.map((_,i)=>COLORS[i%COLORS.length]) }]},
+    options:{ indexAxis:"y", responsive:true, plugins:{legend:{display:false}},
+      scales:{ x:{beginAtZero:true,max:100,ticks:{color:"#9aa1b4"},grid:{color:"#262b3a"}},
+               y:{ticks:{color:"#9aa1b4"},grid:{display:false}} } }
+  });
+  document.getElementById("engagementTable").innerHTML =
+    '<table><caption>Mean Engagement Index by game</caption><thead><tr><th scope="col">Game</th>' +
+    '<th scope="col">Index</th></tr></thead><tbody>' +
+    games.map((g,i)=>'<tr><td>'+esc(g)+'</td><td>'+values[i]+'</td></tr>').join("") + '</tbody></table>';
+}
+
+function renderPlatformTable(rows){
+  const platforms = [...new Set(rows.map(r=>r.platform))].sort();
+  document.querySelector("#platformTable tbody").innerHTML = platforms.map(p => {
+    const s = summarise(rows.filter(r=>r.platform===p));
+    return '<tr><td>' + esc(p) + '</td><td>' + num(s.count) + '</td>' +
+      '<td class="' + sentClass(s.sentiment) + '">' + signed(s.sentiment) + '</td>' +
+      '<td>' + s.engagement.toFixed(1) + '</td></tr>';
+  }).join("") || '<tr><td colspan="4" class="empty">No records in view.</td></tr>';
+}
+
+function renderThemeTable(rows){
+  const themes = themesFor(rows);
+  document.querySelector("#themeTable tbody").innerHTML = themes.length ? themes.map(t =>
+    '<tr><td>' + esc(t.theme) + '</td><td>' + t.count + '</td>' +
+    '<td><span class="tag ' + (t.sentiment>15?"positive":t.sentiment<-15?"negative":"neutral") + '">' +
+      signed(t.sentiment) + '</span></td>' +
+    '<td>' + t.negShare + '%<div class="bar"><span style="width:' + t.negShare + '%"></span></div></td></tr>'
+  ).join("") : '<tr><td colspan="4" class="empty">No themes with 2+ mentions in view.</td></tr>';
+}
+
+function renderRegionTable(rows){
+  const regions = [...new Set(rows.map(r=>r.region))].sort();
+  document.querySelector("#regionTable tbody").innerHTML = regions.map(rg => {
+    const s = summarise(rows.filter(r=>r.region===rg));
+    return '<tr><td>' + esc(rg) + '</td><td>' + num(s.count) + '</td>' +
+      '<td class="' + sentClass(s.sentiment) + '">' + signed(s.sentiment) + '</td>' +
+      '<td>' + s.engagement.toFixed(1) + '</td></tr>';
+  }).join("") || '<tr><td colspan="4" class="empty">No records in view.</td></tr>';
+
+  const sources = {};
+  for (const r of rows){ sources[r.region_source||"none"] = (sources[r.region_source||"none"]||0)+1; }
+  document.getElementById("regionNote").textContent =
+    "Classified from: " + Object.entries(sources).sort((a,b)=>b[1]-a[1])
+      .map(([k,v]) => k.replace(/_/g," ") + " (" + v + ")").join(", ") + ".";
+}
+
+function renderQuestions(rows){
+  const qs = clusterQuestions(rows);
+  document.getElementById("questionsList").innerHTML = qs.length ? qs.map(q =>
+    '<div class="card"><div>' + (q.url ? '<a href="' + esc(q.url) + '" target="_blank" rel="noopener">' + esc(q.question) + '</a>' : esc(q.question)) + '</div>' +
+    '<div class="card-meta"><span class="pill">asked ' + q.asked + '×</span>' +
+    q.games.slice(0,3).map(g=>'<span class="pill">'+esc(g)+'</span>').join("") +
+    q.platforms.slice(0,3).map(p=>'<span class="pill">'+esc(p)+'</span>').join("") +
+    '</div></div>').join("")
+    : '<p class="empty">No clustered questions in this window.</p>';
+}
+
+function renderTopPosts(rows){
+  const posts = [...rows].sort((a,b)=>b.engagement_index-a.engagement_index).slice(0,8);
+  document.getElementById("topPosts").innerHTML = posts.length ? posts.map((p,i) =>
+    '<div class="card"><div>' + (i===0 ? '<span class="tag positive">Top impact</span> ' : '') +
+    esc(p.text.slice(0,300)) + '</div>' +
+    '<div class="card-meta"><span class="pill">' + esc(p.platform) + '</span>' +
+    '<span class="pill">' + esc(p.game) + '</span>' +
+    (p.is_sample ? '<span class="pill sample">sample</span>' : '') +
+    '<span class="tag ' + esc(p.sentiment_label) + '">' + signed(p.sentiment_score) + '</span>' +
+    '<span class="pill">index ' + esc(p.engagement_index) + '</span>' +
+    (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">source</a>' : '') +
+    '</div></div>').join("")
+    : '<p class="empty">No records in view.</p>';
+}
+
+function renderTwitch(){
+  const panel = document.getElementById("twitchPanel");
+  // A live-viewer snapshot has no history, so the time-range and region filters
+  // cannot apply to it. The media-channel filter can and must: if the user has
+  // excluded Twitch, a Twitch panel should not be on screen at all.
+  const channelExcluded = filters.channels.size && !filters.channels.has("Twitch");
+  panel.style.display = channelExcluded ? "none" : "";
+  if (channelExcluded) return;
+
+  const snap = (DATA && DATA.twitch_live) || [];
+  const shown = filters.games.size ? snap.filter(s=>filters.games.has(s.game)) : snap;
+  document.getElementById("twitchLive").innerHTML = shown.length ? shown.map(s =>
+    '<div class="card"><div><b>' + esc(s.game) + '</b></div><div class="card-meta">' +
+    '<span class="pill">' + num(s.liveChannelCount) + ' channels live</span>' +
+    '<span class="pill">' + num(s.totalLiveViewers) + ' viewers now</span>' +
+    (s.topStream ? '<span class="pill">top: ' + esc(s.topStream.userName) + ' (' + num(s.topStream.viewerCount) + ')</span>' : '') +
+    '</div></div>').join("")
+    : '<p class="empty">Twitch is not configured, or no categories are live right now.</p>';
+}
+
+function renderRawTable(rows){
+  const q = document.getElementById("searchBox").value.toLowerCase();
+  const sent = document.getElementById("sentimentFilter").value;
+  const prov = document.getElementById("provenanceFilter").value;
+
+  let out = rows;
+  if (q) out = out.filter(r => (r.text||"").toLowerCase().includes(q));
+  if (sent) out = out.filter(r => r.sentiment_label === sent);
+  if (prov === "collected") out = out.filter(r => !r.is_sample);
+  if (prov === "sample") out = out.filter(r => r.is_sample);
+
+  const shown = out.slice(0,200);
+  document.querySelector("#dataTable tbody").innerHTML = shown.map(r =>
+    '<tr><td>' + esc(r.game) + '</td>' +
+    '<td><span class="pill' + (r.is_sample ? ' sample' : '') + '">' + esc(r.platform) + (r.is_sample ? ' · sample' : '') + '</span></td>' +
+    '<td style="max-width:420px">' + esc((r.text||"").slice(0,240)) + '</td>' +
+    '<td>' + esc(r.theme || "—") + '</td>' +
+    '<td><span class="tag ' + esc(r.sentiment_label) + '">' + signed(r.sentiment_score) + '</span></td>' +
+    '<td>' + esc(r.engagement_index) + '</td></tr>').join("")
+    || '<tr><td colspan="6" class="empty">No records match.</td></tr>';
+
+  document.getElementById("rawCount").textContent =
+    "Showing " + shown.length + " of " + out.length + " matching records (" + RECORDS.length + " total collected and sample).";
+}
+
+function renderFilterSummary(rows){
+  const w = activeWindow();
+  const ch = filters.channels.size ? [...filters.channels].join(", ") : "all channels";
+  const gm = filters.games.size ? [...filters.games].join(", ") : "all games";
+  const rg = filters.region || "all regions";
+  const rangeTxt = (w.from && w.to) ? (w.from + " to " + w.to) : "all time";
+  document.getElementById("filterSummary").innerHTML =
+    "Showing <b>" + num(rows.length) + "</b> records — " + esc(ch) + " · " + esc(gm) +
+    " · " + esc(rg) + " · " + esc(rangeTxt);
+}
+
+// ---------------------------------------------------------------------------
+// Master render — every panel derives from the same filtered set
+// ---------------------------------------------------------------------------
+function render(){
+  buildFilters();
+  const rows = filtered();
+  renderFilterSummary(rows);
+  renderBriefing(rows);
+  renderKPIs(rows);
+  renderVolume(rows);
+  renderSentimentChart(rows);
+  renderEngagementChart(rows);
+  renderPlatformTable(rows);
+  renderThemeTable(rows);
+  renderRegionTable(rows);
+  renderQuestions(rows);
+  renderTopPosts(rows);
+  renderTwitch();
+  renderRawTable(rows);
+}
+
+// ---------------------------------------------------------------------------
+// Load
+// ---------------------------------------------------------------------------
+function renderBanners(){
+  const ds = DATA.data_sources || {};
+  // Three states, not two. "Configured but failing" needs a different colour
+  // from "not set up" because it demands a different action: fix a credential
+  // versus add one. Green must mean data actually arrived.
+  const COLOR = { live:"#3ecf8e", failed:"#ff9f6c", off:"#6f7688" };
+  const stateOf = v => String(v).startsWith("live") ? "live"
+    : String(v).startsWith("configured but") ? "failed" : "off";
+  const dot = state => '<span class="dot" style="background:' + COLOR[state] + '"></span>';
+
+  const rows = Object.entries(ds).map(([k,v]) => {
+    const st = stateOf(v);
+    return dot(st) + '<b>' + esc(k[0].toUpperCase()+k.slice(1)) + ':</b> ' +
+      '<span' + (st === "failed" ? ' style="color:#ffdca8"' : '') + '>' + esc(v) + '</span>';
+  });
+
+  if (DATA.sentiment_engine){
+    const e = DATA.sentiment_engine;
+    const st = e.engine === "claude" ? "live" : e.engine.startsWith("claude") ? "failed" : "off";
+    rows.push(dot(st) + '<b>Sentiment:</b> ' + esc(
+      e.engine === "claude" ? "semantic scoring via " + e.model
+      : e.semantic_configured ? e.engine
+      : "gaming-tuned lexicon fallback — set ANTHROPIC_API_KEY for semantic scoring"));
+  }
+  document.getElementById("sourceBanner").innerHTML = rows.join("<br>");
+
+  const p = DATA.provenance;
+  const pb = document.getElementById("provenanceBanner");
+  if (p && p.sample_records > 0){
+    pb.style.display = "block";
+    pb.innerHTML = '<b>' + p.sample_share_pct + '% of records in this dataset are illustrative sample data</b> (' +
+      num(p.sample_records) + ' of ' + num(p.total_records) + '), standing in for channels with no live feed configured. ' +
+      'They are tagged wherever they appear. Directional comparisons are reasonable; absolute figures are not measurements. ' +
+      'Set <code>DEMO_DATA=false</code> to exclude them.';
+  } else { pb.style.display = "none"; }
+
+  // Only surface errors the source banner above does NOT already explain. A
+  // channel that failed outright reports its reason on its own status line, so
+  // repeating it here just says the same thing twice. What belongs here is the
+  // partial failure — a channel that collected something but lost part of it
+  // (one dead subreddit out of seven, comments disabled on one video), which
+  // the "live" status line would otherwise hide.
+  const errs = DATA.fetch_errors || [];
+  const wholesale = new Set(
+    Object.entries(ds)
+      .filter(([, v]) => String(v).startsWith("configured but"))
+      .map(([k]) => k.toLowerCase())
+  );
+  const partial = errs.filter(e => !wholesale.has(String(e.platform || "").toLowerCase()));
+
+  const eb = document.getElementById("errorBanner");
+  if (partial.length){
+    eb.style.display = "block";
+    eb.innerHTML = '<b>Partial collection — ' + partial.length + ' source' + (partial.length === 1 ? '' : 's') +
+      ' failed within an otherwise working channel:</b> ' +
+      partial.map(e => esc((e.platform||"") + (e.game ? " / " + e.game : "") + " — " + e.message)).join("; ");
+  } else { eb.style.display = "none"; }
+}
+
+async function loadMethodology(){
+  try{
+    const res = await fetch("/api/methodology");
+    const m = await res.json();
+    const list = a => '<ul>' + a.map(x=>'<li>'+esc(x)+'</li>').join("") + '</ul>';
+    document.getElementById("methodBody").innerHTML =
+      '<h4>Sentiment (−100 to +100)</h4>' +
+      '<p>' + esc(m.sentiment.labels) + '. Primary engine: <b>' + esc(m.sentiment.primary_engine.name) + '</b>' +
+      (m.sentiment.primary_engine.active ? ' (active, ' + esc(m.sentiment.primary_engine.model) + ')' : ' (not configured)') + '. It reads:</p>' +
+      list(m.sentiment.primary_engine.reads) +
+      '<p>Fallback: <b>' + esc(m.sentiment.fallback_engine.name) + '</b>, active when ' + esc(m.sentiment.fallback_engine.active_when) +
+      '. It handles ' + esc(m.sentiment.fallback_engine.handles.join(", ")) + ', and cannot handle ' +
+      esc(m.sentiment.fallback_engine.cannot_handle.join(", ")) + '.</p>' +
+      '<p>' + esc(m.sentiment.confidence) + '</p>' +
+
+      '<h4>Engagement Index (0–100)</h4>' +
+      '<p><code>' + esc(m.engagement.formula) + '</code></p>' +
+      list(m.engagement.steps) +
+      '<p>Aggregation: ' + esc(m.engagement.aggregation) + '.</p>' +
+      '<table><thead><tr><th scope="col">Channel</th><th scope="col">Inputs &amp; weights</th><th scope="col">Viral ceiling</th><th scope="col">Why</th></tr></thead><tbody>' +
+      m.engagement.platforms.map(p=>'<tr><td>'+esc(p.platform)+'</td><td>'+esc(p.inputs)+'</td><td>'+num(p.viral_ceiling)+'</td><td>'+esc(p.why)+'</td></tr>').join("") +
+      '</tbody></table>' +
+      '<p>What a score means:</p><table><thead><tr><th scope="col">Range</th><th scope="col">Band</th><th scope="col">Meaning</th></tr></thead><tbody>' +
+      m.engagement.bands.map(b=>'<tr><td>'+esc(b.range)+'</td><td>'+esc(b.label)+'</td><td>'+esc(b.meaning)+'</td></tr>').join("") +
+      '</tbody></table>' +
+      '<p>Limitations:</p>' + list(m.engagement.limitations) +
+
+      '<h4>Publication region</h4>' +
+      '<p>' + esc(m.region.scope) + '</p>' +
+      '<table><thead><tr><th scope="col">Priority</th><th scope="col">Signal</th><th scope="col">API field</th><th scope="col">Confidence</th></tr></thead><tbody>' +
+      m.region.signals.map(s=>'<tr><td>'+s.priority+'</td><td>'+esc(s.name)+'</td><td>'+esc(s.api_field)+'</td><td>'+s.confidence+'</td></tr>').join("") +
+      '</tbody></table>' + list(m.region.limitations) +
+
+      '<h4>Data flow</h4><ol>' +
+      m.data_flow.steps.map(s=>'<li><b>'+esc(s.name)+'</b> — '+esc(s.detail)+'</li>').join("") + '</ol>' +
+      '<p>Dimensions collected: ' + esc(m.data_flow.dimensions_collected.join(", ")) + '.</p>' +
+      '<p>Fields derived: ' + esc(m.data_flow.derived_fields.join(", ")) + '.</p>' +
+
+      '<h4>Briefing length</h4><p>' + esc(m.briefing.recommended_length) + ' — ' + esc(m.briefing.why) + '</p>';
+  } catch(err){
+    document.getElementById("methodBody").textContent = "Could not load methodology: " + err.message;
+  }
+}
+
+async function load(force){
+  document.getElementById("loading").style.display = "flex";
   document.getElementById("refreshBtn").disabled = true;
-  try {
+  try{
     const res = await fetch("/api/analysis" + (force ? "?force=1" : ""));
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to load data");
 
-    ANALYSIS = data;
+    DATA = data;
     RECORDS = data.records || [];
-    VIDEOS = data.videos || [];
-    GAMES = data.games;
-    GAMES.forEach((g,i) => gameColor[g] = COLORS[i % COLORS.length]);
-    computeAllWeeks();
-
-    document.getElementById("lastUpdated").textContent = "Last updated: " + new Date(data.generated_at).toLocaleString();
-
-    if (data.data_sources) {
-      const ds = data.data_sources;
-      const dot = (live) => `<span class="legend-dot" style="background:${live ? '#3ecf8e' : '#9aa1b4'}"></span>`;
-      document.getElementById("dataBanner").innerHTML =
-        `${dot(true)}<b>YouTube:</b> ${ds.youtube}` +
-        `&nbsp;&nbsp;${dot(ds.discord.startsWith('live'))}<b>Discord:</b> ${ds.discord}` +
-        `&nbsp;&nbsp;${dot(ds.twitch && ds.twitch.startsWith('live'))}<b>Twitch:</b> ${ds.twitch || 'not configured'}` +
-        `&nbsp;&nbsp;${dot(false)}<b>Reddit:</b> ${ds.reddit}`;
-    }
-
-    const errBanner = document.getElementById("errorBanner");
-    if (data.fetch_errors && data.fetch_errors.length) {
-      errBanner.style.display = "block";
-      errBanner.innerHTML = "<b>Some sources failed to fetch:</b> " +
-        data.fetch_errors.map(e => `${e.game} (${e.message})`).join("; ");
-    } else {
-      errBanner.style.display = "none";
-    }
-
-    renderAll();
-  } catch (err) {
-    document.getElementById("errorBanner").style.display = "block";
-    document.getElementById("errorBanner").innerHTML = "<b>Couldn't load live data:</b> " + err.message +
-      "<br>Check that server/.env has a valid YOUTUBE_API_KEY and that the server has internet access.";
+    document.getElementById("lastUpdated").textContent =
+      "Updated " + new Date(data.generated_at).toLocaleString();
+    renderBanners();
+    render();
+  } catch(err){
+    const eb = document.getElementById("errorBanner");
+    eb.style.display = "block";
+    eb.innerHTML = "<b>Couldn't load data:</b> " + esc(err.message) +
+      "<br>Check that the server has API credentials configured (see server/.env.example) and internet access.";
   } finally {
-    document.getElementById("loadingOverlay").style.display = "none";
+    document.getElementById("loading").style.display = "none";
     document.getElementById("refreshBtn").disabled = false;
   }
 }
 
-function buildFilterChips(){
-  const el = document.getElementById("gameFilter");
-  const all = ["All", ...GAMES];
-  el.innerHTML = all.map(g => `<div class="chip ${g===currentGame?'active':''}" data-game="${g}">${g}</div>`).join("");
-  el.querySelectorAll(".chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      currentGame = chip.dataset.game;
-      renderAll();
-    });
-  });
-}
+document.getElementById("refreshBtn").addEventListener("click", () => load(true));
+document.getElementById("searchBox").addEventListener("input", () => renderRawTable(filtered()));
+document.getElementById("sentimentFilter").addEventListener("change", () => renderRawTable(filtered()));
+document.getElementById("provenanceFilter").addEventListener("change", () => renderRawTable(filtered()));
+document.getElementById("regionFilter").addEventListener("change", e => { filters.region = e.target.value; render(); });
+document.getElementById("rangeFrom").addEventListener("change", e => { filters.from = e.target.value || null; render(); });
+document.getElementById("rangeTo").addEventListener("change", e => { filters.to = e.target.value || null; render(); });
 
-function selectedRecords(){
-  let recs = currentGame === "All" ? RECORDS : RECORDS.filter(r => r.game === currentGame);
-  recs = recs.filter(r => inSelectedRange(r.timestamp));
-  return recs;
-}
-
-function selectedVideos(){
-  let vids = currentGame === "All" ? VIDEOS : VIDEOS.filter(v => v.game === currentGame);
-  vids = vids.filter(v => inSelectedRange(v.publishedAt));
-  return vids;
-}
-
-function renderKPIs(){
-  const recs = selectedRecords();
-  const n = recs.length;
-  const avgSent = n ? recs.reduce((a,r)=>a+r.sentiment_score,0)/n : 0;
-  const totalEng = recs.reduce((a,r)=>a+r.score,0);
-  const realCount = recs.filter(r=>r.data_type==="real").length;
-  const kpis = [
-    {label:"Records in view", value: fmtNum(n)},
-    {label:"Avg. sentiment", value: (avgSent>=0?"+":"")+avgSent.toFixed(2), cls: avgSent>0.05?"pos":(avgSent<-0.05?"neg":"")},
-    {label:"Total engagement", value: fmtNum(totalEng)},
-    {label:"Live (YouTube) records", value: fmtNum(realCount)},
-  ];
-  document.getElementById("kpiRow").innerHTML = kpis.map(k => `
-    <div class="kpi"><div class="label">${k.label}</div><div class="value ${k.cls||''}">${k.value}</div></div>
-  `).join("");
-}
-
-let volumeChartInst, sentimentChartInst, engagementChartInst;
-
-// All render functions below recompute directly from RECORDS filtered by the
-// current game chip AND the selected time-range slider, so every panel on the
-// page — not just the volume chart — reacts to the window you choose.
-
-function renderVolumeChart(){
-  const ctx = document.getElementById("volumeChart");
-  const gamesToShow = currentGame === "All" ? GAMES : [currentGame];
-  const windowWeeks = ALL_WEEKS.slice(rangeStartIdx, rangeEndIdx + 1);
-
-  const datasets = gamesToShow.map(g => {
-    const byWeek = Object.fromEntries((ANALYSIS.weekly_volume[g] || []).map(w => [w.week, w.count]));
-    return {
-      label: g,
-      data: windowWeeks.map(wk => byWeek[wk] || 0),
-      borderColor: gameColor[g],
-      backgroundColor: gameColor[g]+"33",
-      tension: .3,
-      fill: false,
-    };
-  });
-  if (volumeChartInst) volumeChartInst.destroy();
-  volumeChartInst = new Chart(ctx, {
-    type: "line",
-    data: { labels: windowWeeks, datasets },
-    options: {
-      responsive: true,
-      plugins: { legend: { labels: { color: "#9aa1b4" } } },
-      scales: {
-        x: { ticks: { color: "#9aa1b4" }, grid: { color: "#262b3a" } },
-        y: { ticks: { color: "#9aa1b4" }, grid: { color: "#262b3a" }, beginAtZero: true }
-      }
-    }
-  });
-}
-
-function renderSentimentChart(){
-  const ctx = document.getElementById("sentimentChart");
-  const gamesToShow = currentGame === "All" ? GAMES : [currentGame];
-  const rangeRecs = RECORDS.filter(r => inSelectedRange(r.timestamp));
-  const pos = [], neu = [], neg = [];
-  gamesToShow.forEach(g => {
-    const recs = rangeRecs.filter(r => r.game === g);
-    pos.push(recs.filter(r => r.sentiment_label === "positive").length);
-    neu.push(recs.filter(r => r.sentiment_label === "neutral").length);
-    neg.push(recs.filter(r => r.sentiment_label === "negative").length);
-  });
-  if (sentimentChartInst) sentimentChartInst.destroy();
-  sentimentChartInst = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: gamesToShow,
-      datasets: [
-        { label: "Positive", data: pos, backgroundColor: "#3ecf8e" },
-        { label: "Neutral", data: neu, backgroundColor: "#f5c451" },
-        { label: "Negative", data: neg, backgroundColor: "#ff6b6b" },
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { labels: { color: "#9aa1b4" } } },
-      scales: {
-        x: { stacked: true, ticks: { color: "#9aa1b4" }, grid: { display:false } },
-        y: { stacked: true, ticks: { color: "#9aa1b4" }, grid: { color: "#262b3a" } }
-      }
-    }
-  });
-}
-
-function renderEngagementChart(){
-  const ctx = document.getElementById("engagementChart");
-  const rangeRecs = RECORDS.filter(r => inSelectedRange(r.timestamp));
-  const totals = GAMES.map(g => rangeRecs.filter(r => r.game === g).reduce((a,r)=>a+r.score,0));
-  if (engagementChartInst) engagementChartInst.destroy();
-  engagementChartInst = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: GAMES,
-      datasets: [{
-        label: "Total engagement score",
-        data: totals,
-        backgroundColor: GAMES.map(g => gameColor[g]),
-      }]
-    },
-    options: {
-      indexAxis: "y",
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: "#9aa1b4" }, grid: { color: "#262b3a" } },
-        y: { ticks: { color: "#9aa1b4" }, grid: { display:false } }
-      }
-    }
-  });
-}
-
-function renderThemeTable(){
-  const tbody = document.querySelector("#themeTable tbody");
-  const recs = selectedRecords().filter(r => r.theme);
-  const agg = {};
-  for (const r of recs) {
-    const key = r.theme + "||" + r.game;
-    if (!agg[key]) agg[key] = { theme: r.theme, game: r.game, count: 0, sentSum: 0 };
-    agg[key].count += 1;
-    agg[key].sentSum += r.sentiment_score;
-  }
-  let themes = Object.values(agg).map(t => ({ ...t, avg_sentiment: t.sentSum / t.count }));
-  themes.sort((a,b) => b.count - a.count);
-  themes = themes.slice(0, 10);
-  tbody.innerHTML = themes.map(t => {
-    const cls = t.avg_sentiment>0.05?"positive":(t.avg_sentiment<-0.05?"negative":"neutral");
-    return `<tr><td>${t.theme} <span class="platform-tag">${t.game}</span></td><td>${t.count}</td><td><span class="tag ${cls}">${t.avg_sentiment>=0?'+':''}${t.avg_sentiment.toFixed(2)}</span></td></tr>`;
-  }).join("");
-}
-
-function renderTopPosts(){
-  const el = document.getElementById("topPosts");
-  let posts = [...selectedRecords()].sort((a,b) => b.score - a.score).slice(0, 8);
-  if (posts.length === 0) {
-    el.innerHTML = `<p style="color:var(--muted); font-size:13px;">No records in this window.</p>`;
-    return;
-  }
-  el.innerHTML = posts.map((p, i) => `
-    <div class="post-card">
-      <div>${i === 0 ? '<span class="tag positive" style="margin-right:6px;">🔥 Most viral</span>' : ''}${p.text}</div>
-      <div class="post-meta">
-        <span class="platform-tag">${p.platform}</span>
-        <span class="platform-tag">${p.game}</span>
-        <span class="tag ${p.sentiment_label}">${p.sentiment_label}</span>
-        <span>👍 ${fmtNum(p.score)} likes</span>
-      </div>
-    </div>
-  `).join("");
-}
-
-function renderQuestions(){
-  const el = document.getElementById("questionsList");
-  let qs = selectedRecords().filter(r => r.text.trim().endsWith("?"));
-  qs.sort((a,b) => b.score - a.score);
-  qs = qs.slice(0, 8);
-  if (qs.length === 0){
-    el.innerHTML = `<p style="color:var(--muted); font-size:13px;">No recurring questions surfaced in this window.</p>`;
-    return;
-  }
-  el.innerHTML = qs.map(q => `
-    <div class="post-card">
-      <div>${q.text}</div>
-      <div class="post-meta">
-        <span class="platform-tag">${q.platform}</span>
-        <span class="platform-tag">${q.game}</span>
-        <span>👍 ${fmtNum(q.score)}</span>
-      </div>
-    </div>
-  `).join("");
-}
-
-function renderVideosList(){
-  const el = document.getElementById("videosList");
-  const vids = [...selectedVideos()].sort((a,b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-  if (vids.length === 0){
-    el.innerHTML = `<p style="color:var(--muted); font-size:13px;">No videos published in this window (try widening the range).</p>`;
-    return;
-  }
-  el.innerHTML = vids.map(v => `
-    <div class="video-card">
-      <a href="${v.url}" target="_blank" rel="noopener">${v.title}</a>
-      <div class="post-meta">
-        <span class="platform-tag">${v.game}</span>
-        <span>${new Date(v.publishedAt).toLocaleDateString()}</span>
-        <span>👁 ${fmtNum(v.viewCount)}</span>
-        <span>👍 ${fmtNum(v.likeCount)}</span>
-        <span>💬 ${fmtNum(v.commentCount)}</span>
-      </div>
-    </div>
-  `).join("");
-}
-
-function renderRangeSlider(){
-  const startInput = document.getElementById("rangeStartInput");
-  const endInput = document.getElementById("rangeEndInput");
-  const maxIdx = Math.max(0, ALL_WEEKS.length - 1);
-  startInput.max = maxIdx; endInput.max = maxIdx;
-  startInput.value = rangeStartIdx; endInput.value = rangeEndIdx;
-
-  const fill = document.getElementById("rangeTrackFill");
-  const pct = (idx) => maxIdx === 0 ? 0 : (idx / maxIdx) * 100;
-  fill.style.left = pct(rangeStartIdx) + "%";
-  fill.style.width = Math.max(0, pct(rangeEndIdx) - pct(rangeStartIdx)) + "%";
-
-  const label = document.getElementById("rangeLabel");
-  if (ALL_WEEKS.length) {
-    label.textContent = `${ALL_WEEKS[rangeStartIdx]} → week of ${ALL_WEEKS[rangeEndIdx]}`;
-  } else {
-    label.textContent = "no data yet";
-  }
-}
-
-function renderDataTable(){
-  const tbody = document.querySelector("#dataTable tbody");
-  const search = document.getElementById("searchBox").value.toLowerCase();
-  const platform = document.getElementById("platformFilter").value;
-  const sentiment = document.getElementById("sentimentFilter").value;
-  let recs = selectedRecords();
-  if (search) recs = recs.filter(r => r.text.toLowerCase().includes(search));
-  if (platform) recs = recs.filter(r => r.platform === platform);
-  if (sentiment) recs = recs.filter(r => r.sentiment_label === sentiment);
-  recs = recs.slice(0, 150);
-  tbody.innerHTML = recs.map(r => `
-    <tr>
-      <td>${r.game}</td>
-      <td><span class="platform-tag">${r.platform}${r.data_type==='real'?' ✓':''}</span></td>
-      <td>${r.content_type}</td>
-      <td style="max-width:420px;">${r.text}</td>
-      <td>${fmtNum(r.score)}</td>
-      <td><span class="tag ${r.sentiment_label}">${r.sentiment_label}</span></td>
-    </tr>
-  `).join("");
-}
-
-function renderTwitchLive(){
-  const el = document.getElementById("twitchLiveList");
-  const snapshot = (ANALYSIS && ANALYSIS.twitch_live) || [];
-  const filtered = currentGame === "All" ? snapshot : snapshot.filter(s => s.game === currentGame);
-
-  if (!filtered.length){
-    el.innerHTML = `<p style="color:var(--muted); font-size:13px;">Twitch not configured yet — add TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET to server/.env and restart the server.</p>`;
-    return;
-  }
-  el.innerHTML = filtered.map(s => `
-    <div class="video-card">
-      <span class="platform-tag">${s.game}</span>
-      <div class="post-meta">
-        <span>📡 ${s.liveChannelCount} channel${s.liveChannelCount === 1 ? '' : 's'} live</span>
-        <span>👀 ${fmtNum(s.totalLiveViewers)} viewers right now</span>
-        ${s.topStream ? `<span>Top: <a href="${s.topStream.url}" target="_blank" rel="noopener">${s.topStream.userName}</a> (${fmtNum(s.topStream.viewerCount)})</span>` : ''}
-      </div>
-    </div>
-  `).join("");
-}
-
-function renderAll(){
-  buildFilterChips();
-  renderRangeSlider();
-  renderKPIs();
-  renderVolumeChart();
-  renderSentimentChart();
-  renderEngagementChart();
-  renderThemeTable();
-  renderTopPosts();
-  renderQuestions();
-  renderVideosList();
-  renderTwitchLive();
-  renderDataTable();
-}
-
-document.getElementById("searchBox").addEventListener("input", renderDataTable);
-document.getElementById("platformFilter").addEventListener("change", renderDataTable);
-document.getElementById("sentimentFilter").addEventListener("change", renderDataTable);
-document.getElementById("refreshBtn").addEventListener("click", () => loadData(true));
-
-document.getElementById("rangeStartInput").addEventListener("input", (e) => {
-  let v = Number(e.target.value);
-  if (v > rangeEndIdx) v = rangeEndIdx;
-  rangeStartIdx = v;
-  renderAll();
-});
-document.getElementById("rangeEndInput").addEventListener("input", (e) => {
-  let v = Number(e.target.value);
-  if (v < rangeStartIdx) v = rangeStartIdx;
-  rangeEndIdx = v;
-  renderAll();
-});
-document.getElementById("resetRangeBtn").addEventListener("click", () => {
-  rangeStartIdx = 0;
-  rangeEndIdx = Math.max(0, ALL_WEEKS.length - 1);
-  renderAll();
-});
-
-loadData(false);
+loadMethodology();
+load(false);
 </script>
-
 </body>
 </html>

@@ -1,105 +1,249 @@
-# Gaming Community Pulse — 15-Minute Presentation Script
+# Gaming Community Pulse v2 — 15-Minute Presentation Script
 
-*A talk track for presenting this placement project. Timings are approximate at a natural speaking pace — practice once and adjust. [Bracketed notes] are stage directions, not things to say out loud.*
+*A talk track for presenting the rebuilt tool to Ruisheng Holdings. It's about 2,325 spoken words, which lands a shade over fifteen minutes if you speak at roughly 150 words a minute — so it is tight rather than comfortable. Time yourself once against a stopwatch before the day, and use the cut list below if you're over. [Bracketed notes] are stage directions, not things to say out loud.*
+
+**Before you start:** have the dashboard already loaded in a browser tab (`cd server && npm start`, then `http://localhost:3000`) so you aren't waiting on a collection run in front of the room. Methodology panel collapsed, filters cleared, time range on its default 30 days. Credentials live in `server/.env`, which is deliberately not committed — copy `server/.env.example` and fill in the keys the day before, or every channel will read "not configured" and the entire dataset on screen will be illustrative sample.
+
+**If you're running long,** cut in this order: the accessibility and vendoring line at the end of §5, the "sample sizes are hundreds" limitation in §6 (it's covered by the banner on screen anyway), and the second half of §3 — you can summarise questions five to nine in one sentence and let the demo make the point. Never cut §6 entirely; the honesty is the part that earns the room's trust.
 
 ---
 
-## 1. Opening (0:00–1:00)
+## 1. Opening — the brief, and why it matters here (0:00–1:00)
 
-Hi everyone. Today I want to walk you through a prototype I built during this placement: a lightweight social listening dashboard for gaming communities, and what it tells us about five real titles — PUBG, Once Human, Marvel Rivals, Where Winds Meet, and World of Warcraft.
+Morning, everyone. Thank you for the time.
 
-The brief was simple to state and hard to do well: can we build something that listens to what gamers are actually saying on Reddit, Discord, and YouTube, and turn that into signals a marketing team could actually use — without needing expensive enterprise software?
+The brief was this: RS has no simple, low-cost way to see what gaming communities are saying online. Those conversations are the least filtered audience insight there is, and they're scattered across Reddit, Discord, YouTube and Twitch in volumes nobody can read by hand. So — build a lightweight prototype that listens to public conversation, organises it by game and theme, and surfaces something a marketing team can act on, without an enterprise contract.
 
-Over the next fifteen minutes I'll cover four things: how I approached the research and data collection, a live look at the dashboard itself, what we actually found across these five games, and where I think this goes next.
+I built it against five of your titles: PUBG, Once Human, Marvel Rivals, Where Winds Meet and World of Warcraft — deliberately five very different communities, from a new open world to a twenty-year-old MMO in expansion fatigue. If it works across those five, it works across most of your roster.
 
-## 2. Scope and approach (1:00–4:00)
+What I'm showing you today isn't the first version. It's the second — and the second exists because you sent me nine questions about the first.
 
-First, scope. I deliberately picked five very different communities, not five similar shooters. PUBG is a long-running battle royale with an established, sometimes jaded fanbase. Once Human is a survival game with gacha mechanics, right on the edge of a big console launch. Marvel Rivals is a live-service hero shooter riding a content-update cycle. Where Winds Meet is a newly launched open-world game still building its audience. And World of Warcraft is twenty years old, currently dealing with expansion fatigue. I wanted to stress-test the tool against communities that behave completely differently from each other.
+## 2. What version one did — and what it got wrong (1:00–3:00)
 
-[Pause] Now, an important honesty point, because I think it matters more than the pretty charts: not all of this data is real, and I want to be upfront about exactly which parts are and aren't.
+[Stay off the screen for this. Say it looking at the room.]
 
-YouTube data is real. It's pulled live from the YouTube Data API — actual comments, actual view counts, actual likes, refreshed on demand.
+Version one looked like a working dashboard. In several important places it wasn't one, and I'd rather tell you that than have you find it later.
 
-Reddit and Discord started as illustrative sample data, because Reddit's website was blocked for automated access in the environment I was building this in, and Discord requires a bot to actually be invited into a specific server — I didn't have that access when I started. So rather than fake being able to do something I couldn't, I built a clearly-labelled synthetic dataset modeled on realistic discussion patterns, so the rest of the pipeline — the analysis, the dashboard, the sentiment scoring — could all be built and tested properly.
+It showed 507 records. Fifty-five of those were real YouTube comments. The other 452 — every Reddit row and every Discord row — were synthetic, generated by a script, because Reddit was unreachable from my environment and I had no Discord access. Reddit wasn't partly built; there was no Reddit code at all. So roughly nine records in ten were illustrative.
 
-And actually, partway through this project, I did get Discord access sorted out — I'll show you that it's now live for one channel as a proof of concept, with the same illustrative-Reddit-still-static caveat.
+Sentiment was keyword matching on a minus-one-to-plus-one scale. It couldn't read sarcasm — and in gaming that matters, because "this boss is insane" and "that clip is sick" are both praise.
 
-I think this distinction — being clear about what's real versus illustrative — is actually one of the more useful parts of this project, because it's exactly the kind of question a client would ask, and being able to answer it precisely builds trust.
+Engagement was one number per game: eleven thousand for PUBG, just under ten thousand for Marvel Rivals. That was YouTube likes plus Reddit upvotes plus Discord reactions, added together untransformed. Different units at wildly different scales — a top comment on an official trailer runs to four figures of likes, a Discord message gets three reactions. Summing them makes "total engagement" mostly a measure of which API I called the most. It shouldn't have been presented as though the games were comparable.
 
-## 3. Live dashboard walkthrough (4:00–7:30)
+Themes existed only on the synthetic rows, because I'd written them into the generator. The real comments carried none. And the report described spike detection and recurring questions, but neither was computed — the spikes were baked into the fake data, and "recurring question" meant the text ended in a question mark.
 
-[Switch to the live dashboard at localhost:3000]
+And there was no history at all. The only state was a five-minute cache in memory that died with the process. So "what changed since yesterday" wasn't a question the tool could answer even in principle.
 
-Let me show you the actual tool. This is running locally right now, pulling live data as we speak.
+[Pause.]
 
-At the top, you can see the data source banner — it tells you plainly what's live and what isn't, right now: YouTube live, Discord live for one test channel, Reddit still illustrative. No guessing.
+That's the honest baseline. Then came the nine questions.
 
-These chips let you filter the whole dashboard down to one game, or look at all five together. [Click a game chip]
+## 3. What you came back with (3:00–5:00)
 
-This is the weekly discussion volume chart — and this is actually a good example of something I had to fix along the way. Real YouTube comments can trail back months, while the illustrative sample only covers a tight eight-week window. Mixed together, the older stretch looked almost flat compared to the recent spike. So I added this range slider underneath — you can drag it to zoom into any time window you want, and every other panel on the page reacts to your selection. By default it opens on the most recent eight weeks so you're not staring at a long quiet stretch first.
+[Optional: a slide listing the nine. Otherwise count them off.]
 
-Right next to it, sentiment mix — positive, neutral, and negative share of the conversation, for whatever game and time window is selected.
+Nine questions — and they were the right nine.
 
-Down here: engagement by game, so you can see at a glance which community is loudest by upvotes, likes, and reactions. And recurring themes — this is where the tool starts doing real work for a marketing team, because it's naming the actual topics driving the conversation, not just a sentiment number.
+**One, sentiment.** Could it move past keyword matching to something that reads meaning, context and sarcasm — and could the score be minus-100 to plus-100, which reads more naturally than decimals.
 
-Top posts and comments is sorted purely by how liked something is — and I made a point of pulling comments two different ways here: once by recency, and once by YouTube's own top-comments ranking, so a genuinely viral comment doesn't get missed just because it's a few months old. The single most-liked one gets flagged.
+**Two, engagement.** What's the formula? What goes in, how is each input weighted, how are they combined, is it normalised, and what does a given score mean in practice.
 
-And recurring questions — this is the one I'd point to first in a real meeting, because these are literally ready-made content ideas. Things like "does console get the same content as PC" or "what's the best early build" — these are FAQ posts and guide videos waiting to be made.
+**Three, region.** Can content be classified by the region it was *published* in — explicitly not by working out where individual commenters live.
 
-Below that, "Videos in this window" shows exactly which real YouTube uploads are contributing to whatever time range you've selected, with direct links.
+**Four, data sources and processing.** What sources, what dimensions, how it's processed, how the metrics are generated, and how data flows from the platform to the screen.
 
-[Pause, look up from screen] That's the tool. Now let's talk about what it actually found.
+**Five, global filters.** Media channel at the top as a global filter, time range alongside it, product-slash-game — and every card and chart responding to them.
 
-## 4. Key findings (7:30–11:30)
+**Six, an AI-written daily summary.** Not only charts: a short written brief on what's happening each day. And you asked how many words is appropriate.
 
-Across roughly five hundred data points at the time of my main analysis, one pattern stood out clearly: sentiment tracks almost exactly with how a community feels treated by recent content, not with how much people generally like the game.
+**Seven, end-user experience.** The test you set, quoting: someone should open this each morning and understand what's happening within a few minutes, without manually interpreting a large number of charts.
 
-Where Winds Meet came out as the most positive community in the study. Its open-world design praise scored the highest of any single theme we measured, and it had the lowest share of negative sentiment of any of the five games. Its friction points were the predictable free-to-play ones — monetization concerns, server queues at launch.
+**Eight, business value.** What should the team pay attention to today; are there community risks; emerging trends; discussions that could inspire campaigns.
 
-Marvel Rivals told an interesting split story. Praise for the game itself — the roster, the content cadence — scored the best of any theme in the whole dataset. But netcode and matchmaking complaints were the single largest theme by volume, and deeply negative. Players love what the game is, and are frustrated by how it performs.
+**Nine, the deliverable.** Confirmation that you get the complete source code, so your technical team can deploy it internally.
 
-PUBG sat almost exactly neutral overall, but for two very different reasons pulling in opposite directions: cheating and hacking complaints were the worst-scoring theme for that game, while a recent Spider-Man crossover was genuinely one of the best-received pieces of content across the entire dataset.
+Question seven is the one that reorganised everything. A wall of charts fails that test no matter how good the charts are. So — let me show you.
 
-Once Human showed real excitement for its console launch and real love for its base-building system — one of the single highest-engagement posts in the whole study was someone raving about decorating their base — but monetization and bugs were its two most negative themes.
+## 4. Live demo (5:00–9:30)
 
-And World of Warcraft was the most sceptical community we measured. But — and this is the important nuance — that scepticism was specifically about the expansion messaging and class balance changes, not the game as a whole. Story and questline content actually scored as the best theme for WoW. So the marketing problem there isn't "people don't like the game," it's "the current pitch for what's new isn't landing."
+[Switch to the browser.]
 
-One more finding worth mentioning: across platforms, YouTube comments ran the most positive, Discord second, Reddit closest to neutral — which makes sense, since YouTube is where people go to react to a trailer, and Reddit is where people go to actually debate and critique.
+### Open on the briefing (5:00–6:00)
 
-## 5. Recommendations for marketing use (11:30–13:30)
+This is the top of the page, deliberately. A headline, a written brief, then four columns: what to watch today, community risks, campaign opportunities, and what's changed since the last snapshot.
 
-So what does a marketing team actually do with this?
+You asked what word count is right. A hundred and fifty to two hundred — about a minute's read, which is the realistic attention budget before a stand-up. Below a hundred and twenty it stops being specific and becomes horoscope text; above two hundred and fifty, people skim, and a skimmed narrative is worse than a scannable list. So the narrative carries the judgement and everything else is bullets.
 
-Content planning is the most direct use — those recurring questions I showed you are a ready-made shortlist instead of guesswork about what content to make next.
+[Point at the footer line under the briefing.]
 
-Campaign research: you can benchmark a community's sentiment before a launch or a season, and then measure the actual lift afterward — we saw that clearly with PUBG's crossover moment.
+This line names which engine wrote it. With no API key configured the panel doesn't go blank and doesn't pretend — it says "rule-based fallback" and gives you a computed summary instead.
 
-Community monitoring works as an early warning system — a rising negative theme, like Marvel Rivals' netcode complaints, is exactly the kind of thing you'd want to catch before it becomes a public relations story.
+[Point at the banners above.]
 
-And it gives you a consistent scorecard for comparing titles across a portfolio, which is genuinely useful in a pitch or a quarterly review.
+And these are the provenance. Every channel says live or not-configured with a timestamp, the sentiment line says which scorer ran, and if any data is illustrative sample, this amber banner gives the exact percentage.
 
-But I want to be honest about the limits too, because I think that's actually more valuable than overselling it. Sentiment scoring — mine included — struggles with sarcasm and in-jokes. Small samples can swing wildly on a handful of viral posts. And critically, this tool tells you what people are saying and roughly how they feel — it doesn't tell you why in any deep sense, and it can't replace a human's judgment on tone, timing, or how to actually respond.
+### The global filters (6:00–7:00)
 
-## 6. Closing and next steps (13:30–15:00)
+[Scroll to the sticky bar.]
 
-To wrap up: what I've delivered is a working prototype that's honest about what's real and what's illustrative, a live dashboard that actually pulls fresh YouTube data and, as of this week, live Discord data too, a set of findings that hold up as genuinely useful marketing signal, and a clear path to extend it further.
+Your question five. Media channel, product-slash-game, time range — and I added publication region as a fourth.
 
-The next steps, if this were to continue: get proper Reddit API access to replace that last illustrative piece, add scheduled automatic refreshes instead of on-demand ones, upgrade the sentiment scoring to a real NLP model now that there's API access available, and pilot it with one real account team on one real title to see what they actually want more of.
+[Click a channel chip, then a game chip.]
 
-That's the project. Happy to answer any questions, or to pull up any part of the dashboard again if you want to see something specific.
+Every panel below re-derives instantly, because the API sends the row-level records down alongside the aggregates, so filtering never goes back to the server. Channels and games are multi-select; the count on each chip is how many records it holds. One panel is deliberately exempt: the Twitch live-viewer snapshot is a right-now figure rather than historical text, so only the game filter touches it, and the panel says so.
+
+[Click through 7 days, then 30. If asked why "Today" isn't empty: the presets anchor to the newest record, not the wall clock.]
+
+[Point at the note that has appeared inside the briefing panel.]
+
+And note this line, which appears as soon as a filter is on: the briefing was written from the full dataset, not your filtered view. Filters drive every panel underneath it, but not the brief. Better it says so than that you assume otherwise.
+
+### Sentiment, engagement, region (7:00–8:45)
+
+[Scroll to the metrics.]
+
+Headline metrics: records in view split collected versus sample, mean sentiment on the minus-100 to plus-100 scale you asked for, Engagement Index, risk signals, negative share.
+
+[Point at the volume chart.]
+
+Volume with sentiment overlaid — and the orange bars are statistically detected spikes, not ones I eyeballed. A bucket is flagged when it's at least two standard deviations above the trailing baseline *and* at least one and a half times that baseline, so a quiet stretch can't make a two-record bump look dramatic.
+
+[Point at the Engagement Index chart.]
+
+The rebuilt engagement metric: nought to a hundred, normalised per platform, and a game's figure is the *mean* of its records rather than the sum — a sum just rewards whichever channel I collected more rows from.
+
+[Scroll to themes and region.]
+
+Themes come from a controlled vocabulary of seventeen labels, so live rows carry themes and everything aggregates into one table instead of splitting into near-duplicate labels.
+
+Publication region — question three. Americas, EMEA, APAC, Undetermined. This line underneath is the part I'd point at: it names which signal decided the split and how many records each accounted for. Nothing here is a guess about where a commenter lives.
+
+[Scroll to questions.]
+
+And recurring questions are genuinely clustered by topic now, so "asked eleven times" means eleven separate posts asking the same thing — grouped by topic overlap, not by wording. That's the panel I'd give a content planner first.
+
+### The methodology panel (8:45–9:30)
+
+[Open "How every number on this page is calculated". Scroll it slowly rather than reading it out.]
+
+Questions two and four, answered on screen instead of in a document. The engagement formula in full, the per-channel weights and viral ceilings with the reasoning for each, what a score in each band means, and the limitations of the metric — written by me, inside the tool. Then the region signals with a confidence each, the pipeline steps, and every field collected and derived.
+
+It's served from an endpoint, so it can't drift out of date relative to the code.
+
+## 5. What actually changed under the bonnet (9:30–12:00)
+
+[Back to the room.]
+
+Six changes, in plain language.
+
+**Reddit is real now.** Official OAuth API, application-only authentication, read-only access to public subreddits, no scraping. Five subreddits, one per title, three calls each per refresh — comfortably inside the free tier.
+
+**Sentiment reads meaning.** Every record goes to Claude in batches of forty and comes back with a score from minus-100 to plus-100, a confidence, a sarcasm flag, a theme, whether it's a genuine question, whether it's a risk worth escalating, and what language it's in. The model is told how gamers talk: "insane", "sick", "cracked" and "goated" are praise; "cash grab", "dead game" and "content drought" are not. Non-English text is scored on meaning rather than dropped. With no API key it falls back to the lexicon — which now handles negation, intensifiers, slang, emoji and shouting, but still can't do genuine sarcasm, and says so on screen. Be straight about the size of that fallback: the lexicon scores sentiment only. It assigns no theme and flags no record as a risk, and it treats any sentence ending in a question mark as a question. So without a key, the theme and risk panels reflect only the labelled sample, and question detection drops back to the crude test I criticised a minute ago. The API key is what makes those three panels real.
+
+**Engagement became an index.** Three steps. Combine each channel's own metrics, weighted by the effort they represent — a reply beats a like, a like beats a passive view. Compress logarithmically, so one viral post can't dominate an average. Then divide by that platform's own viral ceiling, so a hundred means "as viral as this platform gets" rather than "big number". That last step is what makes cross-channel comparison legitimate.
+
+**Region uses publisher-side signals only.** In priority order: the channel's declared country, a region we've set in config, the Discord server's locale, the published content language, and — only as a last resort, at low confidence — the language of the text. No usable signal means Undetermined, shown honestly rather than dropped into a default bucket.
+
+**The analysis is genuinely computed.** Spikes, themes, risk scoring and question clustering all run on real numbers. Risks come from two places: records the semantic layer flags as escalation-worthy, and themes crossing a threshold of volume and negativity. Each carries a severity, so the panel ranks rather than dumps.
+
+**And it remembers.** One small snapshot a day, aggregates only, compared against the most recent earlier one — which is what makes the deltas real.
+
+One last thing: the charting library is vendored into the repo rather than loaded from a CDN, the page is properly accessible — real buttons, labelled controls, visible focus, a screen-reader table behind every chart — and all text is escaped before it reaches the page, which matters when you're rendering strangers' comments.
+
+## 6. What it still can't do (12:00–14:00)
+
+[Slow down. This section is the one that builds trust.]
+
+The limitations, honestly.
+
+**The sample data still ships, by default.** You chose to keep it and that's reasonable — but to be precise: 452 illustrative rows, 295 Reddit and 157 Discord. They only ever stand in for a channel with no live feed on that run, so as soon as Reddit starts returning live rows, the Reddit sample drops out rather than stacking on top of real data. Each is tagged wherever it appears, the banner shows the percentage, and one environment variable removes them entirely.
+
+**Discord is one channel.** A single permissioned test channel — live the moment a bot token is configured, and labelled as its own entry rather than sitting under one of the five titles. Proof the integration works, not coverage. Discord can only ever grow one server invitation at a time, because reading messages needs a bot invited by an admin. That's the only compliant route: a genuine limit, not a bug.
+
+**Sample sizes are hundreds, not millions.** These figures support direction-of-travel judgements, not absolute claims.
+
+**The region split is coarse today.** Global publisher channels declare one country, so an entire catalogue lands in one bucket, and Twitch has no publisher country at all so it's classified by stream language — a proxy. Expect meaningful Undetermined until regional sources are configured, and that's configuration, not code.
+
+**The engagement ceilings are my calibration constants** — the order of magnitude at which a post is unambiguously viral on each platform. They're stated in the open so they can be argued with, but re-tune them against your own campaign data before this goes into client reporting. And the index measures reach and intensity, not sentiment: ninety can be ninety units of anger.
+
+**Next, in order.** Run it daily for a fortnight, so the snapshots accumulate and the deltas become the most valuable panel on the page. Hand-label a couple of hundred comments and actually measure the sentiment accuracy — right now I can tell you how it works, not how right it is. Configure regional sources. Add scheduled refreshes and alerting. And pilot it with one account team on one title, because the fastest way to find what's missing is to give it to someone with a real deadline.
+
+## 7. Close (14:00–15:00)
+
+To wrap up.
+
+You get the complete source code — question nine. It boots with no credentials at all; every unconfigured source is labelled rather than failing, and you add keys to bring each channel live one at a time. Deployment configurations for Render and Vercel are in the repo, with an environment file documenting every variable.
+
+What I think I've delivered is this. A tool that answers all nine questions inside the product rather than in a document. A sentiment score that reads a sentence instead of counting words in it. An engagement number that's comparable across channels and explains itself on screen. And a briefing at the top, so someone can open this at nine in the morning, read for a minute, and know where to look.
+
+Plus a set of limitations I've written down, rather than left for you to find.
+
+Thank you. Happy to take questions, or to pull any panel back up.
 
 [End]
 
 ---
 
-## Appendix: quick reference numbers (for Q&A)
+## If you only remember three things
 
-- **Most positive game:** Where Winds Meet (avg sentiment +0.185)
-- **Most negative game:** World of Warcraft (avg sentiment −0.093)
-- **Highest engagement:** PUBG (11,024 total engagement score in the original static analysis)
-- **Worst single theme:** Marvel Rivals netcode/matchmaking complaints (−0.67 average sentiment, largest theme by volume)
-- **Best single theme:** Where Winds Meet open-world praise (+0.725 average sentiment)
-- **Platform tone ranking:** YouTube most positive → Discord → Reddit closest to neutral
-- **Data honesty:** YouTube = real, live. Discord = live for one configured channel. Reddit = illustrative sample pending API access.
+1. **Open on the briefing, not the charts.** A hundred and fifty to two hundred words at the top, written from the day's data, with the charts underneath as evidence. That's the difference between a dashboard and something a team uses at nine in the morning.
+2. **Every number explains itself.** The engagement formula, the per-channel weights and ceilings, the region signals and their confidences, and the limitations of each — rendered on the page, served from the code, so they can't drift out of date.
+3. **Provenance is never hidden.** What's live, what's illustrative, which sentiment engine ran, which signal decided a region — on screen, always. Nine records in ten were illustrative in version one; today the banner gives you the exact figure on every load.
 
-*(These specific numbers come from the original static analysis in `GAMING_COMMUNITY_PULSE_REPORT.md`. If you refresh the live dashboard before presenting, the live YouTube/Discord numbers will differ slightly — the patterns and direction should hold, but call out that live figures are a fresh snapshot, not the same run.)*
+---
+
+## Anticipated questions
+
+**"How accurate is the sentiment?"**
+
+I can tell you precisely what it does; I can't yet give you an accuracy figure, and I'd rather say so than invent one. What it does: each message goes to Claude with instructions about gaming vocabulary, sarcasm and negation, and comes back with a score, a confidence between nought and one, and a sarcasm flag. Every record carries that confidence, and a low-confidence record shouldn't drive a decision on its own. Where I'd expect it to be weakest: very short messages, in-jokes specific to one community, non-English text — scored on meaning, but deliberately at reduced confidence — and Twitch clip titles, which are streamer promotional copy rather than player opinion and will read slightly optimistic. If the API key is unset it degrades to the lexicon, which explicitly cannot resolve sarcasm; the dashboard names which engine ran, so you're never guessing. The proper way to answer your question is to hand-label two hundred comments and measure agreement — about a day's work, and I'd do it before this informs a client recommendation.
+
+**"What does the engagement number mean?"**
+
+An index from nought to a hundred, per record. Three steps: the platform's own metrics combined with weights reflecting effort — on YouTube a reply counts triple a like; on Reddit a comment counts five times an upvote; on Discord a reaction counts ten times, because reacting means you were already in that server, in that channel, at that moment. Then logarithmic compression, so one viral post can't swamp an average. Then division by that platform's viral ceiling — five thousand weighted likes on YouTube, twenty thousand on Reddit, four hundred on Discord, five hundred thousand clip views on Twitch. A hundred therefore means "as viral as this platform gets", not "a large number", and that's what makes the games comparable.
+
+In practice: nought to twenty is background chatter; twenty to forty is noticed by the immediate community; forty to sixty is outperforming its peers; sixty to eighty broke out beyond the core audience; eighty-plus is platform-level viral and is a signal in its own right. Two caveats. A game's figure is the mean of its records, not the sum. And the index measures reach and reaction intensity, not sentiment — ninety can be ninety units of anger.
+
+**"Can we trust the region split?"**
+
+Trust it as *publication* region, and only as far as the confidence says. Every record carries the signal that decided it and a confidence: the channel's declared country is 0.95, a region we've set in config is 0.9, a Discord server's declared locale 0.8, the published content language 0.7, and the language of the text itself 0.4 — used only where nothing better exists. The panel prints the mix of signals under the table, so you can see whether a split rests on strong signals or weak ones.
+
+What it is not: an audience geography breakdown. We never locate individual commenters — the platforms don't expose it, and it would be personal data outside this placement's data rules. And today it's coarse, because global publisher channels declare one country for an entire catalogue and Twitch is classified by stream language. To make it decision-grade you'd configure regional sources — a regional YouTube channel, a language-specific subreddit with its region declared — which is configuration, not code.
+
+**"What does it cost to run?"**
+
+Everything except the AI is free tier. YouTube gives ten thousand quota units a day and a full refresh of all five channels costs roughly ninety-five, so quota isn't a practical constraint. Reddit's free tier allows a hundred queries a minute averaged over ten; we make three per subreddit per refresh. Discord's and Twitch's APIs cost nothing. Hosting fits a free Render instance or a Vercel hobby project.
+
+The only metered cost is the Anthropic API, which powers the semantic sentiment and the briefing. It defaults to Claude Opus 5, published at five dollars per million input tokens and twenty-five per million output. Three things keep that small: records are scored forty at a time in one call rather than one call each; results are cached by content hash, so a comment already scored isn't scored again; and the whole analysis is cached for five minutes server-side, so refreshing the page doesn't re-run the pipeline. A refresh of a few hundred new comments is pennies, not pounds. I won't quote a monthly figure, because I haven't run it for a month — I'd want a fortnight of real usage first. If cost became a concern, one environment variable points it at a cheaper model tier, and removing the key drops it to the lexicon at zero cost, with the dashboard saying so.
+
+**"Is any of this data still fake?"**
+
+Yes — by default, by your choice, and labelled everywhere.
+
+The illustrative sample is 452 rows: 295 Reddit and 157 Discord, generated by a script that's in the repo (`scripts/generate_synthetic.py`). It's loaded so the dashboard demonstrates a complete tool, but it only ever stands in for a channel with no live feed on that run. Once Reddit is configured and returning rows, the Reddit sample rows are dropped rather than mixed in with real data.
+
+Every sample row carries a flag, is tagged in the records table and on any post it appears in, and is counted in the amber banner as a percentage of the dataset. There's a provenance filter, so you can view collected-only in one click. And `DEMO_DATA=false` removes it entirely — at which point the dashboard shows exactly what's genuinely being collected, which is what I'd recommend for a first internal deployment.
+
+Everything from YouTube, Reddit, Discord and Twitch, whenever those are configured, is real and fetched live through the official APIs.
+
+**"Can our technical team deploy this themselves?"**
+
+Yes — that's question nine. Complete source code, Node and Express, five dependencies. It boots with no credentials at all and marks each unconfigured source on screen. `server/.env.example` documents every variable and what you lose by omitting it. There's a `render.yaml` for Render and a `vercel.json` for Vercel. One deployment note: point `SNAPSHOT_DIR` at a mounted volume, or the day-over-day history resets on every redeploy. Nothing goes stale when that happens — with no earlier snapshot the briefing says the comparison isn't available yet and the "changed since last snapshot" column stays empty rather than inventing movement — but you'd want it fixed before the deltas are the panel anyone relies on.
+
+**"What personal data does it hold?"**
+
+Public display names only — the handle attached to a public post. No commenter is ever geolocated. The daily snapshots hold aggregates only — counts, mean scores, theme totals — so no comment text and no author handle is written to disk at all; the only place anyone's words appear is the live page, from the current refresh. All collection is through official APIs within each platform's terms; nothing is scraped.
+
+---
+
+## Appendix: figures you may want to hand
+
+**Version one, for contrast:** 507 records, of which 55 were real YouTube comments and 452 were synthetic (295 Reddit, 157 Discord). Sentiment on a −1 to +1 lexicon. Engagement as a raw sum. No Reddit implementation, no history, no region, no briefing.
+
+**Version two, as configured:** five YouTube channels, five subreddits, five Twitch categories, one permissioned Discord channel. Per refresh — eight recent uploads per YouTube channel with up to fifty comments each (fetched by both recency and top-comment ranking, then deduplicated); up to fifty top posts and a hundred recent comments per subreddit; twenty top Twitch clips per category from the last thirty days plus a live viewer snapshot; a hundred Discord messages. Themes come from a seventeen-label controlled vocabulary. Snapshots are kept for ninety days.
+
+**Spike rule, if asked:** a bucket is flagged when its volume is at least two standard deviations above the mean of the previous six buckets *and* at least 1.5× that mean, with a minimum of three records.
+
+**Risk rule, if asked:** a theme is flagged at four or more mentions, 55%+ negative share and a mean sentiment at or below −10; individual records can also be flagged by the semantic layer and are grouped per game. Each risk carries a 0–100 severity.
+
+*Live figures change on every refresh — quote them from the screen on the day, not from this page.*

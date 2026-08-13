@@ -110,12 +110,20 @@ HTML = """<!DOCTYPE html>
 <body>
 
 <header>
-  <h1>Gaming Community Pulse — Prototype Dashboard</h1>
+  <h1>Gaming Community Pulse — Frozen Snapshot (v1)</h1>
   <p class="sub">Social listening prototype covering public discussion of PUBG, Once Human, Marvel Rivals, Where Winds Meet, and World of Warcraft across Reddit, Discord, and YouTube.</p>
+  <div class="banner" style="border-color:#5a4a22;background:#241f16;color:#ffdca8">
+    <b>This is the archived v1 snapshot, frozen at 30 July 2026.</b> It is kept for reference only.
+    The current tool is the live dashboard in <code>server/</code> — run <code>npm start</code> and open
+    <code>http://localhost:3000</code>. The live version adds Reddit and Twitch collection, semantic
+    sentiment on a &minus;100&hellip;+100 scale, an Engagement Index normalised per channel, publication-region
+    classification, global media-channel / game / time-range filters, and an AI daily briefing. Sentiment
+    figures on this page use the older &minus;1&hellip;+1 scale and are not comparable with the live tool.
+  </div>
   <div class="banner">
     <span class="legend-dot" style="background:#6c8cff"></span><b>YouTube data is real</b> — collected live from public video comment sections on 2026-07-30.
     &nbsp;&nbsp;
-    <span class="legend-dot" style="background:#9aa1b4"></span><b>Reddit and Discord data is illustrative/synthetic</b> — modeled on realistic public discourse patterns because Reddit is not reachable and Discord requires server-specific access this prototype doesn't have. See methodology doc for details and how to switch to live feeds.
+    <span class="legend-dot" style="background:#9aa1b4"></span><b>Reddit and Discord data is illustrative/synthetic</b> — modeled on realistic public discourse patterns because, at the time of this snapshot, Reddit was not reachable and Discord required server-specific access the prototype did not have. Both are live in the current tool.
   </div>
 </header>
 
@@ -299,15 +307,22 @@ function renderSentimentChart(){
 
 function renderEngagementChart(){
   const ctx = document.getElementById("engagementChart");
+  // FIXED: this previously plotted every game regardless of the selected game
+  // chip, reading an all-time precomputed total that responded to no filter at
+  // all. It now derives from the records actually in view.
+  const gamesToShow = currentGame === "All" ? GAMES : [currentGame];
+  const totals = gamesToShow.map(g =>
+    RECORDS.filter(r => r.game === g).reduce((a, r) => a + Number(r.score || 0), 0)
+  );
   if (engagementChartInst) engagementChartInst.destroy();
   engagementChartInst = new Chart(ctx, {
     type: "bar",
     data: {
-      labels: GAMES,
+      labels: gamesToShow,
       datasets: [{
         label: "Total engagement score",
-        data: GAMES.map(g => ANALYSIS.by_game[g].total_engagement_score),
-        backgroundColor: GAMES.map(g => gameColor[g]),
+        data: totals,
+        backgroundColor: gamesToShow.map(g => gameColor[g]),
       }]
     },
     options: {

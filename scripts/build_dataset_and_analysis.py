@@ -203,12 +203,17 @@ for game in GAMES:
         "negative": dist.get("negative", 0),
     }
 
-    # weekly volume + sentiment (last 8 weeks, synthetic Reddit/Discord window only —
-    # YouTube real comments span months and would create sparse/misleading gaps if mixed in)
+    # Weekly volume + sentiment across the 8-week window.
+    #
+    # FIXED: this previously skipped every row where data_type != "synthetic",
+    # on the reasoning that real YouTube comments span months and would create
+    # sparse gaps. The effect was that the static dashboard's only time series
+    # contained ZERO real data by construction, while being presented as the
+    # project's discussion-volume chart. Real rows are now included; rows that
+    # fall outside the 8-week window are excluded by the window filter below,
+    # which is the honest way to handle the spread.
     weekly = defaultdict(lambda: {"count": 0, "sent_sum": 0.0})
     for r in grows:
-        if r["data_type"] != "synthetic":
-            continue
         ts = dt.datetime.fromisoformat(r["timestamp"])
         # bucket by ISO week start (Monday)
         week_start = ts.date() - dt.timedelta(days=ts.date().weekday())
