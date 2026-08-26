@@ -11,8 +11,15 @@ services:
       # own machine. Comma-separated username:password pairs, e.g.
       # "alice:correct-horse-battery,bob:another-passphrase". Left unset, the
       # app still boots (it still boots with everything below unset too) but
-      # is wide open, with a loud warning in the logs saying so.
+      # is wide open, with a loud warning in the logs saying so. Gates a real
+      # /login page, not a browser popup.
       - key: AUTH_USERS
+        sync: false
+      # Signs the session cookie issued by /login. Set this to any long
+      # random string (e.g. `openssl rand -hex 32`). Left unset, a random
+      # secret is generated per process — on Render that means every restart
+      # or redeploy signs everyone out, so set this explicitly.
+      - key: SESSION_SECRET
         sync: false
       # Semantic sentiment + AI daily briefing. Without it the tool still runs,
       # falling back to the gaming-tuned lexicon and a computed brief.

@@ -96,11 +96,24 @@ let cache = { data: null, fetchedAt: 0 };
 
 // ---------------------------------------------------------------------------
 // Access control — this is an internal tool and must not be left open to the
-// internet. Gate every route, static assets included, before anything else.
-// See lib/auth.js for the full design notes.
+// internet. A real /login page + signed session cookie gates every route,
+// static assets included, before anything else. See lib/auth.js for the
+// full design notes.
 // ---------------------------------------------------------------------------
-const auth = buildAuth(process.env.AUTH_USERS);
-app.use(auth.middleware);
+const auth = buildAuth(process.env.AUTH_USERS, process.env.SESSION_SECRET);
+
+// Render and Vercel both terminate TLS in front of this app, so the request
+// Express sees is plain HTTP even in production. `trust proxy` makes
+// `req.secure` reflect the original X-Forwarded-Proto instead of always
+// reading false — that's what lets the session cookie get the Secure flag
+// in production while still working over plain http://localhost locally.
+app.set("trust proxy", 1);
+
+app.get("/login", auth.loginPage);
+app.post("/login", express.urlencoded({ extended: false }), auth.loginSubmit);
+app.get("/logout", auth.logout);
+
+app.use(auth.requireAuth);
 
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "dashboard-live.html")));
@@ -659,7 +672,12 @@ app.get("/api/health", (req, res) => {
     semantic_analysis: { configured: nlp.isConfigured(), model: nlp.isConfigured() ? nlp.MODEL : null },
     demo_data_enabled: DEMO_DATA,
     storage: store.storageInfo(),
-    access_control: { configured: auth.configured, user_count: auth.userCount },
+    access_control: {
+      configured: auth.configured,
+      user_count: auth.userCount,
+      login_url: "/login",
+      session_secret_set: !auth.sessionSecretEphemeral,
+    },
   });
 });
 
@@ -680,7 +698,19 @@ if (require.main === module) {
         "*************************************************************************\n"
       );
     } else {
-      console.log(`Access control: ON — ${auth.userCount} user(s) configured via AUTH_USERS.`);
+      console.log(`Access control: ON — ${auth.userCount} user(s) configured via AUTH_USERS. Login page at /login.`);
+      if (auth.sessionSecretEphemeral) {
+        console.warn(
+          "\n" +
+          "*************************************************************************\n" +
+          "*  WARNING: SESSION_SECRET is not set — a random one was generated for  *\n" +
+          "*  this process only. Everyone gets signed out whenever this instance   *\n" +
+          "*  restarts or a new one spins up (guaranteed on serverless hosts like  *\n" +
+          "*  Vercel). Set SESSION_SECRET to any long random string for stable     *\n" +
+          "*  sessions across restarts.                                            *\n" +
+          "*************************************************************************\n"
+        );
+      }
     }
 
     const missing = [];

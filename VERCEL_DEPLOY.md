@@ -58,6 +58,7 @@ Add environment variables one at a time, then redeploy so they take effect:
 
 ```bash
 npx vercel env add AUTH_USERS production
+npx vercel env add SESSION_SECRET production
 npx vercel env add ANTHROPIC_API_KEY production
 npx vercel env add YOUTUBE_API_KEY production
 # …and so on for each variable in §4
@@ -68,22 +69,32 @@ npx vercel --prod
 
 ## 4. Environment variables
 
-Eight credentials and two behaviour flags. Earlier versions of this document
+Nine credentials and two behaviour flags. Earlier versions of this document
 listed only two variables — that predates Reddit going live, the semantic
-scoring layer and the snapshot store.
+scoring layer, the snapshot store, and the login form.
 
-**Set `AUTH_USERS` before you deploy.** Every other credential below is
-optional — the app boots and runs fine without it, just with that source
-marked unavailable on screen. `AUTH_USERS` is different: this project is
-meant to be an internal RS tool, and a Vercel deployment URL is reachable by
-anyone who has it unless this is set. Leaving it blank means the dashboard —
-including every real comment, clip and message it has collected — is public.
+**Set `AUTH_USERS` and `SESSION_SECRET` before you deploy.** Every other
+credential below is optional — the app boots and runs fine without it, just
+with that source marked unavailable on screen. These two are different: this
+project is meant to be an internal RS tool, and a Vercel deployment URL is
+reachable by anyone who has it unless `AUTH_USERS` is set. Leaving it blank
+means the dashboard — including every real comment, clip and message it has
+collected — is public.
+
+`SESSION_SECRET` matters more on Vercel than anywhere else this app runs.
+Vercel functions are stateless and can spin up a fresh instance per request;
+if `SESSION_SECRET` is left unset, each instance generates its own random
+secret, so a session cookie signed by one instance fails verification on the
+next — people get logged out constantly, sometimes mid-session. Set it
+explicitly (`openssl rand -hex 32` is a good way to generate one) so every
+instance verifies the same cookies.
 
 ### Credentials
 
 | Key | Unlocks | If you leave it blank |
 |---|---|---|
-| `AUTH_USERS` | **Required.** Comma-separated `username:password` pairs (e.g. `alice:correct-horse-battery,bob:another-passphrase`) — HTTP Basic Auth in front of every route, including the static dashboard | The deployment is publicly reachable with no login. Vercel's function logs print a loud warning at every cold start when this is the case. |
+| `AUTH_USERS` | **Required.** Comma-separated `username:password` pairs (e.g. `alice:correct-horse-battery,bob:another-passphrase`) — gates a real `/login` page in front of every route, including the static dashboard | The deployment is publicly reachable with no login. Vercel's function logs print a loud warning at every cold start when this is the case. |
+| `SESSION_SECRET` | **Required for stable logins.** Signs the session cookie `/login` issues. Any long random string. | A random secret is generated per instance, so sessions break across cold starts — see above. |
 | `ANTHROPIC_API_KEY` | Semantic sentiment (sarcasm, negation, gaming slang, non-English text), themes on live records, question and risk flags, and the AI daily briefing | Gaming-tuned lexicon fallback; live records carry no theme; no record-level risk flags, though theme-level risk detection still runs; the brief is computed from the figures and labelled as such on screen |
 | `YOUTUBE_API_KEY` | YouTube comments and video stats for the five tracked channels | YouTube absent from the dashboard — there is no YouTube sample data |
 | `REDDIT_CLIENT_ID` | Live Reddit via the official OAuth API (needs the secret too) | Labelled illustrative sample rows stand in, or nothing if `DEMO_DATA=false` |
@@ -243,15 +254,17 @@ Open `/api/health` on the deployment URL Vercel gave you. Expect roughly:
   "semantic_analysis": { "configured": true, "model": "claude-opus-5" },
   "demo_data_enabled": true,
   "storage": { "mode": "ephemeral", "directory": "/tmp/…", "snapshots_held": 0, "retention_days": 90, "durable": false },
-  "access_control": { "configured": true, "user_count": 2 }
+  "access_control": { "configured": true, "user_count": 2, "login_url": "/login", "session_secret_set": true }
 }
 ```
 
-You need valid `AUTH_USERS` credentials just to load this page — `/api/health`
+You need to be signed in at `/login` just to load this page — `/api/health`
 is behind the same access control as every other route, deliberately, so an
 unauthenticated status check can't leak configuration state. If
 `access_control.configured` is `false`, stop here: the deployment is
-currently open to the public internet, and §4 above is what to fix.
+currently open to the public internet, and §4 above is what to fix. If
+`access_control.session_secret_set` is `false`, set `SESSION_SECRET` — without
+it, cold starts will keep signing people out (see §4).
 
 `configured` means the credentials are present, not that the last call
 succeeded. The `games` list is the union of the `game` values across all four

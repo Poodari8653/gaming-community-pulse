@@ -43,26 +43,57 @@ its own directory regardless of where you started the process.
 ## 2. Access control
 
 This is an internal RS tool and must not be left reachable by anyone who finds
-the URL. Access control is HTTP Basic Auth, gated by `lib/auth.js` in front of
-every route — the static dashboard included, not just the API.
+the URL. Access control is a real `/login` page — styled to match the
+dashboard, not the browser's native Basic Auth popup — backed by a signed
+session cookie. `lib/auth.js` gates every route with this: the static
+dashboard included, not just the API.
 
-Set a comma-separated list of `username:password` pairs:
+Set a comma-separated list of `username:password` pairs, and a session
+signing secret:
 
 ```bash
 AUTH_USERS=alice:correct-horse-battery,bob:another-passphrase
+SESSION_SECRET=any-long-random-string
 ```
 
-Restart the server after changing it. Every request then needs valid
-credentials for one of those pairs; the browser's native login prompt handles
-this with no extra UI to build. Password comparison is timing-safe
+Restart the server after changing either. Visiting any page while signed out
+redirects to `/login`; API calls made while signed out get a `401` JSON body
+instead of a redirect, so the dashboard's own `fetch()` calls fail cleanly
+rather than receiving an HTML page where JSON was expected. Signing in at
+`/login` sets a session cookie good for 7 days; `/logout` clears it. A "Log
+out" link sits in the dashboard header.
+
+Password comparison and cookie-signature comparison are both timing-safe
 (`crypto.timingSafeEqual`), and an unknown username is compared against a
 fixed dummy value rather than short-circuiting, so a wrong username and a
 wrong password behave identically from the outside.
 
+**The session cookie is signed, not stored server-side.** It's an
+HMAC-SHA256-signed `{ user, exp }` payload (`SESSION_SECRET` is the signing
+key), so there's no session store, no database, and nothing that needs to
+survive between requests — the same reasoning that ruled out server-side
+sessions in the first place applies here too (see §7 — the same
+ephemeral-filesystem issue that affects daily snapshots would affect a
+session store). The cookie itself is `HttpOnly` (not readable from page
+JavaScript), `SameSite=Lax` (not sent on cross-site requests that change
+state), and gets the `Secure` flag automatically whenever the request arrived
+over HTTPS (Render and Vercel both terminate TLS in front of the app;
+`server.js` sets `app.set("trust proxy", 1)` so Express sees that correctly).
+
+**Set `SESSION_SECRET` for any real deployment.** If it's left unset, the
+server generates a random one at startup so it still boots — but that secret
+is per-process. Every restart, redeploy, or (on a serverless host like
+Vercel) every new instance invalidates every existing session, signing
+everyone out. A loud warning prints in the logs when this is the case, the
+same way it does for `AUTH_USERS`. `/api/health` reports
+`access_control.session_secret_set` so you can check a deployed instance
+without shell access to its logs.
+
 **If `AUTH_USERS` is left unset, the app still boots — matching every other
 optional integration in this codebase — but the instance is wide open, with no
-login required.** A loud warning prints in the server logs at startup when
-this is the case:
+login required**, and `/login` itself just redirects straight through to the
+dashboard. A loud warning prints in the server logs at startup when this is
+the case:
 
 ```
 WARNING: AUTH_USERS is not set — this instance is WIDE OPEN, with no
@@ -76,21 +107,18 @@ Treat that warning as blocking for any deployment beyond your own laptop.
 `access_control.user_count`, so you can check a deployed instance's state
 without needing shell access to its logs.
 
-**Why Basic Auth and not a login page / SSO.** The requirement here is simple
-— keep this off the open internet for a small, fixed set of internal users,
-not manage accounts, roles, or self-service signup. Basic Auth needs no
-session store, no cookies, and no database, which also sidesteps the
-durability problems a session store would hit on a serverless host (see §7 —
-the same ephemeral-filesystem issue that affects daily snapshots would affect
-server-side sessions too). If RS later wants a branded login page or
-SSO/Google Workspace login instead of the browser's native prompt, that's a
+**Why a signed cookie and not SSO.** The requirement here is simple — keep
+this off the open internet for a small, fixed set of internal users, not
+manage accounts, roles, or self-service signup. If RS later wants
+SSO/Google Workspace login instead of a username/password form, that's a
 larger, separate piece of work layered on top of this, not a replacement for
 it.
 
-**This does not encrypt credentials in transit on its own** — Basic Auth
-sends them base64-encoded, which is not encryption. It's safe only because
-both Render and Vercel terminate HTTPS in front of the app by default. Do not
-put this behind plain HTTP anywhere the request would cross a real network.
+**This does not encrypt anything in transit on its own** — the login form
+posts a plain username/password, and the session cookie is signed, not
+encrypted. It's safe only because both Render and Vercel terminate HTTPS in
+front of the app by default. Do not put this behind plain HTTP anywhere the
+request would cross a real network.
 
 ---
 
@@ -403,9 +431,9 @@ Collection volumes are constants near the top of `server.js`:
   tables; and the loading spinner respects `prefers-reduced-motion`. All
   interpolated text passes through an HTML-escaping helper.
 - **Access control.** The whole dashboard, this panel included, sits behind
-  HTTP Basic Auth once `AUTH_USERS` is set — see §2. It is unauthenticated by
-  default for local development, which is why that section's startup warning
-  matters before deploying anywhere else.
+  the `/login` form and session cookie once `AUTH_USERS` is set — see §2. It
+  is unauthenticated by default for local development, which is why that
+  section's startup warning matters before deploying anywhere else.
 
 ---
 
@@ -436,7 +464,9 @@ copy is expected to be in the repository already.
 | Symptom | Cause and fix |
 |---|---|
 | Startup logs "WARNING: AUTH_USERS is not set — WIDE OPEN" | Expected until you set `AUTH_USERS` (§2). Fine for local testing; do not deploy in this state. |
-| Browser keeps re-prompting for a password / "Authentication required" | Wrong username or password against the pairs in `AUTH_USERS`, or a typo/missing `:` when the variable was set. Check `/api/health`'s `access_control.user_count` matches what you expect (needs valid credentials to view, deliberately). |
+| Startup logs "WARNING: SESSION_SECRET is not set" | Sessions won't survive a restart/redeploy/new instance — everyone gets signed out. Set `SESSION_SECRET` to any long random string (§2). |
+| `/login` keeps redirecting back to itself with "Incorrect username or password" | Wrong username or password against the pairs in `AUTH_USERS`, or a typo/missing `:` when the variable was set. Check `/api/health`'s `access_control.user_count` matches what you expect (needs a valid session to view, deliberately). |
+| Logged in, then signed out again a few minutes later for no reason | `SESSION_SECRET` is unset (or changed) and the process restarted — see the SESSION_SECRET warning above. |
 | Startup logs "Not configured: …" | Expected with an empty `.env`. Those sources are skipped; everything else still runs. |
 | Sentiment banner says "gaming-tuned lexicon fallback" | `ANTHROPIC_API_KEY` is unset or the `@anthropic-ai/sdk` package is missing. The banner reflects only whether the key and SDK are present — if the key is set but batches are failing, the banner still names the model, so check `sentiment_engine.errors` and `sentiment_engine.fallback` in `/api/analysis`, and the per-record `sentiment_method`, to see what was actually scored semantically. |
 | Themes panel looks thin, or only shows sample data | Themes on live records come from the semantic layer. Without `ANTHROPIC_API_KEY`, live rows carry no theme. |

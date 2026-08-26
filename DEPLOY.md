@@ -69,20 +69,23 @@ To set it up manually instead: **New +** → **Web Service** → select the repo
 
 ## 3. Add the environment variables
 
-`render.yaml` declares eight credentials as `sync: false`, meaning Render will
+`render.yaml` declares nine credentials as `sync: false`, meaning Render will
 prompt for them rather than storing them in the repository. Add them in the
 service's **Environment** tab.
 
-**Set `AUTH_USERS` before you finish this section.** Every other row in this
-table is optional — the dashboard boots and runs without it, just with that
-source marked unavailable. `AUTH_USERS` is not like that: leaving it unset
-means the deployed URL is open to anyone on the internet who finds it, with no
-login. This is meant to be an internal RS tool, so treat this one row as
-mandatory even though Render will happily let you skip it.
+**Set `AUTH_USERS` and `SESSION_SECRET` before you finish this section.**
+Every other row in this table is optional — the dashboard boots and runs
+without it, just with that source marked unavailable. These two are not like
+that: leaving `AUTH_USERS` unset means the deployed URL is open to anyone on
+the internet who finds it, with no login; leaving `SESSION_SECRET` unset means
+signed-in users get logged out every time Render restarts the service. This is
+meant to be an internal RS tool, so treat both rows as mandatory even though
+Render will happily let you skip them.
 
 | Key | Unlocks | If you leave it blank |
 |---|---|---|
-| `AUTH_USERS` | **Required.** Comma-separated `username:password` pairs (e.g. `alice:correct-horse-battery,bob:another-passphrase`) — HTTP Basic Auth in front of every route, dashboard included | The deployment is publicly reachable with no login. A loud warning prints in the Render service logs at every startup when this is the case — treat that warning as blocking. |
+| `AUTH_USERS` | **Required.** Comma-separated `username:password` pairs (e.g. `alice:correct-horse-battery,bob:another-passphrase`) — gates a real `/login` page in front of every route, dashboard included | The deployment is publicly reachable with no login. A loud warning prints in the Render service logs at every startup when this is the case — treat that warning as blocking. |
+| `SESSION_SECRET` | **Required.** Signs the session cookie `/login` issues. Any long random string, e.g. `openssl rand -hex 32`. | A random secret is generated per process start, so every restart or redeploy signs everyone out. A loud warning prints in the logs when this is the case. |
 | `ANTHROPIC_API_KEY` | Semantic sentiment (sarcasm, negation, gaming slang, non-English text), themes on live records, question and risk flags, and the AI daily briefing | Lexicon fallback; live records carry no theme; no record-level risk flags, though theme-level risk detection still runs; the brief is computed rather than written, and says so |
 | `YOUTUBE_API_KEY` | YouTube comments and video stats | YouTube absent — there is no YouTube sample data to stand in |
 | `REDDIT_CLIENT_ID` | Live Reddit (with the secret below) | Labelled sample rows stand in, or nothing if `DEMO_DATA=false` |
@@ -183,14 +186,16 @@ like:
   "semantic_analysis": { "configured": true, "model": "claude-opus-5" },
   "demo_data_enabled": true,
   "storage": { "mode": "configured", "directory": "/var/data/snapshots", "snapshots_held": 1, "retention_days": 90, "durable": true },
-  "access_control": { "configured": true, "user_count": 2 }
+  "access_control": { "configured": true, "user_count": 2, "login_url": "/login", "session_secret_set": true }
 }
 ```
 
-Note you need `AUTH_USERS` credentials just to load this page at all, which is
-correct — `/api/health` is behind the same access control as everything else.
-If `access_control.configured` is `false` here, stop and go back to §3; that
-means the deployment is currently open to the public internet.
+Note you need to be signed in at `/login` just to load this page at all, which
+is correct — `/api/health` is behind the same access control as everything
+else. If `access_control.configured` is `false` here, stop and go back to §3;
+that means the deployment is currently open to the public internet. If
+`access_control.session_secret_set` is `false`, set `SESSION_SECRET` — every
+restart will otherwise sign people out.
 
 Check each `configured` flag matches what you entered, and that
 `semantic_analysis.configured` is `true` if you added an Anthropic key.
