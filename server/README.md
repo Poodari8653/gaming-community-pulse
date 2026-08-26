@@ -40,7 +40,61 @@ its own directory regardless of where you started the process.
 
 ---
 
-## 2. Environment variables
+## 2. Access control
+
+This is an internal RS tool and must not be left reachable by anyone who finds
+the URL. Access control is HTTP Basic Auth, gated by `lib/auth.js` in front of
+every route — the static dashboard included, not just the API.
+
+Set a comma-separated list of `username:password` pairs:
+
+```bash
+AUTH_USERS=alice:correct-horse-battery,bob:another-passphrase
+```
+
+Restart the server after changing it. Every request then needs valid
+credentials for one of those pairs; the browser's native login prompt handles
+this with no extra UI to build. Password comparison is timing-safe
+(`crypto.timingSafeEqual`), and an unknown username is compared against a
+fixed dummy value rather than short-circuiting, so a wrong username and a
+wrong password behave identically from the outside.
+
+**If `AUTH_USERS` is left unset, the app still boots — matching every other
+optional integration in this codebase — but the instance is wide open, with no
+login required.** A loud warning prints in the server logs at startup when
+this is the case:
+
+```
+WARNING: AUTH_USERS is not set — this instance is WIDE OPEN, with no
+login required. Fine for local testing on your own machine. Before
+deploying anywhere reachable off your machine, set AUTH_USERS in
+.env or this dashboard is public.
+```
+
+Treat that warning as blocking for any deployment beyond your own laptop.
+`/api/health` also reports `access_control.configured` and
+`access_control.user_count`, so you can check a deployed instance's state
+without needing shell access to its logs.
+
+**Why Basic Auth and not a login page / SSO.** The requirement here is simple
+— keep this off the open internet for a small, fixed set of internal users,
+not manage accounts, roles, or self-service signup. Basic Auth needs no
+session store, no cookies, and no database, which also sidesteps the
+durability problems a session store would hit on a serverless host (see §7 —
+the same ephemeral-filesystem issue that affects daily snapshots would affect
+server-side sessions too). If RS later wants a branded login page or
+SSO/Google Workspace login instead of the browser's native prompt, that's a
+larger, separate piece of work layered on top of this, not a replacement for
+it.
+
+**This does not encrypt credentials in transit on its own** — Basic Auth
+sends them base64-encoded, which is not encryption. It's safe only because
+both Render and Vercel terminate HTTPS in front of the app by default. Do not
+put this behind plain HTTP anywhere the request would cross a real network.
+
+---
+
+## 3. Environment variables
 
 Every variable in `.env.example`, what it unlocks, and what happens without it.
 
@@ -75,7 +129,7 @@ Both halves of a pair are required. `REDDIT_CLIENT_ID` without
 
 ---
 
-## 3. What is live and what is sample
+## 4. What is live and what is sample
 
 Rebuilt from `server.js`. "Live" means the platform is collected from its
 official API when its credentials are present.
@@ -112,7 +166,7 @@ to the semantic API**.
 
 ---
 
-## 4. The pipeline
+## 5. The pipeline
 
 `server.js` runs six steps on every uncached request:
 
@@ -170,7 +224,7 @@ to the semantic API**.
 
 ---
 
-## 5. API endpoints
+## 6. API endpoints
 
 ### `GET /api/analysis`
 
@@ -187,8 +241,8 @@ button does. Note that a forced refresh re-collects from every platform and
 re-scores any text not already in the content-hash cache, so it is the expensive
 call.
 
-The response includes row-level text. It is not a small payload, and it is not
-access-controlled — see §9.
+The response includes row-level text. It is not a small payload. It **is**
+access-controlled along with every other route once `AUTH_USERS` is set — see §2.
 
 ### `GET /api/methodology`
 
@@ -222,18 +276,24 @@ Deployment check. Returns:
     "snapshots_held": 3,
     "retention_days": 90,
     "durable": true
-  }
+  },
+  "access_control": { "configured": true, "user_count": 2 }
 }
 ```
+
+`/api/health` is itself behind `AUTH_USERS` like every other route — you need
+valid credentials to check whether credentials are required, which is correct:
+an unauthenticated deployment status check would leak configuration state to
+anyone who found the URL.
 
 `configured` means the credentials are present, not that the last call
 succeeded. For collection failures, read `fetch_errors` in `/api/analysis`.
 `"Community Test Channel"` in the `games` list is the placeholder entry in
-`discord_channels.json` — see §8.
+`discord_channels.json` — see §9.
 
 ---
 
-## 6. Daily snapshots and day-over-day deltas
+## 7. Daily snapshots and day-over-day deltas
 
 `lib/store.js` writes one compact JSON snapshot per day — aggregates only, no
 raw records, a few KB. The next day's refresh reads the most recent *earlier*
@@ -262,7 +322,7 @@ and still lose history at the next deploy.
 
 ---
 
-## 7. Cost
+## 8. Cost
 
 Semantic scoring calls a paid API. Three things keep that bounded, and one
 undoes them:
@@ -293,7 +353,7 @@ three calls per subreddit per refresh.
 
 ---
 
-## 8. Configuration files
+## 9. Configuration files
 
 All under `server/config/`. Restart the server after editing; no code changes
 are needed to add a source.
@@ -319,7 +379,7 @@ Collection volumes are constants near the top of `server.js`:
 
 ---
 
-## 9. Dashboard notes
+## 10. Dashboard notes
 
 - **Global filter bar.** Media channel, product/game, time range and publication
   region sit in a sticky bar at the top and drive every chart, table and metric
@@ -335,20 +395,21 @@ Collection volumes are constants near the top of `server.js`:
   the briefing was written from.
 - **Time range anchors to the newest record**, not to the wall clock, so the
   historical sample data does not produce an empty dashboard on first load.
-- **Chart.js is vendored**, not loaded from a CDN — see §10.
-- **Accessibility.** Skip link to the briefing; filters are real `<button>`
-  elements with `aria-pressed`; every control has a label; visible focus outlines
-  throughout; `aria-live` regions on the briefing, KPI row and filter summary;
-  a visually-hidden text-equivalent table for every chart; captions on data
+- **Chart.js is vendored**, not loaded from a CDN — see §11.
+- **Accessibility.** Skip link to the briefing; every filter is a native
+  `<select>`; every control has a label; visible focus outlines throughout;
+  `aria-live` regions on the briefing, KPI row and filter summary; a
+  visually-hidden text-equivalent table for every chart; captions on data
   tables; and the loading spinner respects `prefers-reduced-motion`. All
   interpolated text passes through an HTML-escaping helper.
-- **No authentication.** `/api/analysis` returns row-level public post text to
-  anyone who can reach it. Public posts are public, but put the deployment behind
-  access control before treating it as an internal tool.
+- **Access control.** The whole dashboard, this panel included, sits behind
+  HTTP Basic Auth once `AUTH_USERS` is set — see §2. It is unauthenticated by
+  default for local development, which is why that section's startup warning
+  matters before deploying anywhere else.
 
 ---
 
-## 10. Chart.js is vendored locally
+## 11. Chart.js is vendored locally
 
 `server/public/vendor/chart.umd.min.js` is a copy of Chart.js that belongs in the
 repository, and the dashboard loads it from there. There is **no CDN
@@ -370,10 +431,12 @@ copy is expected to be in the repository already.
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 | Symptom | Cause and fix |
 |---|---|
+| Startup logs "WARNING: AUTH_USERS is not set — WIDE OPEN" | Expected until you set `AUTH_USERS` (§2). Fine for local testing; do not deploy in this state. |
+| Browser keeps re-prompting for a password / "Authentication required" | Wrong username or password against the pairs in `AUTH_USERS`, or a typo/missing `:` when the variable was set. Check `/api/health`'s `access_control.user_count` matches what you expect (needs valid credentials to view, deliberately). |
 | Startup logs "Not configured: …" | Expected with an empty `.env`. Those sources are skipped; everything else still runs. |
 | Sentiment banner says "gaming-tuned lexicon fallback" | `ANTHROPIC_API_KEY` is unset or the `@anthropic-ai/sdk` package is missing. The banner reflects only whether the key and SDK are present — if the key is set but batches are failing, the banner still names the model, so check `sentiment_engine.errors` and `sentiment_engine.fallback` in `/api/analysis`, and the per-record `sentiment_method`, to see what was actually scored semantically. |
 | Themes panel looks thin, or only shows sample data | Themes on live records come from the semantic layer. Without `ANTHROPIC_API_KEY`, live rows carry no theme. |

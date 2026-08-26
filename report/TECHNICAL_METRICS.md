@@ -276,7 +276,43 @@ Runs when `ANTHROPIC_API_KEY` is unset, the model call errors, or the model refu
 
 ---
 
-## 12. API surface
+## 12. Access control (`lib/auth.js`)
+
+This is an internal RS tool and must not be reachable by anyone who finds the
+URL. HTTP Basic Auth gates every route — the static dashboard included, not
+just the API — via Express middleware mounted before `express.static` and
+before any route handler.
+
+- **Configuration**: a single `AUTH_USERS` env var, a comma-separated list of
+  `username:password` pairs (`alice:pass1,bob:pass2`). Parsed once at startup
+  into a `Map`; malformed entries (no `:`) are skipped rather than crashing
+  the process.
+- **No sessions, no cookies, no database.** Every request carries its own
+  credentials, which is what makes this work identically whether the process
+  is a long-lived Render service or a stateless Vercel serverless function —
+  there's no session store whose durability would need solving, unlike the
+  daily-snapshot problem described in §9.
+- **Credential check**: the `Authorization: Basic <base64>` header is
+  decoded, split on the first `:`, and the password is compared against the
+  configured value with `crypto.timingSafeEqual` (after padding both buffers
+  to equal length, since `timingSafeEqual` throws on a length mismatch and a
+  length-based early exit would itself leak timing information). An unknown
+  username is compared against a fixed dummy placeholder rather than
+  short-circuited, so a wrong username and a wrong password take the same
+  code path.
+- **Fail-open by design when unconfigured.** If `AUTH_USERS` is unset, the
+  middleware is a deliberate no-op — matching how every other optional
+  integration in this codebase behaves (it boots regardless, with the
+  feature simply unavailable). A loud, multi-line warning prints to the
+  console at startup when this is the case, and `/api/health` reports
+  `access_control.configured: false` so this is checkable on a live
+  deployment without shell access to its logs.
+- **Transport security is assumed, not provided.** Basic Auth sends
+  credentials base64-encoded, which is encoding, not encryption. This is
+  acceptable only because both deployment targets (Render, Vercel) terminate
+  HTTPS in front of the app by default.
+
+## 13. API surface
 
 | Endpoint | Purpose |
 |---|---|
@@ -286,7 +322,7 @@ Runs when `ANTHROPIC_API_KEY` is unset, the model call errors, or the model refu
 
 ---
 
-## 13. Front-end (`server/public/dashboard-live.html`)
+## 14. Front-end (`server/public/dashboard-live.html`)
 
 - Single-file HTML/CSS/JS, Chart.js **vendored locally** (`server/public/vendor/chart.umd.min.js`, refreshed via `npm run postinstall` → `server/scripts/vendor-chartjs.js`) rather than loaded from a CDN, so the dashboard renders on an egress-restricted internal network.
 - **Global sticky filter bar**: channel (platform), game, and time-range — all three apply client-side to every panel below, computed from the row-level `records` the API already returned (no extra round trip per filter change).
@@ -295,7 +331,7 @@ Runs when `ANTHROPIC_API_KEY` is unset, the model call errors, or the model refu
 
 ---
 
-## 14. Stack & dependencies
+## 15. Stack & dependencies
 
 - **Runtime**: Node.js ≥18, Express 4.
 - **AI**: `@anthropic-ai/sdk` (^0.68.0) — Claude Opus 5 by default, used for both semantic sentiment scoring and the daily briefing.
@@ -307,7 +343,7 @@ Runs when `ANTHROPIC_API_KEY` is unset, the model call errors, or the model refu
 
 ---
 
-## 15. Known limitations, stated in the code itself
+## 16. Known limitations, stated in the code itself
 
 Collected here from each module's own documented caveats, so nothing is overstated to a reader who only sees this summary:
 

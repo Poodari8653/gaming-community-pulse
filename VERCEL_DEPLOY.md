@@ -57,6 +57,7 @@ npx vercel --prod
 Add environment variables one at a time, then redeploy so they take effect:
 
 ```bash
+npx vercel env add AUTH_USERS production
 npx vercel env add ANTHROPIC_API_KEY production
 npx vercel env add YOUTUBE_API_KEY production
 # …and so on for each variable in §4
@@ -67,14 +68,22 @@ npx vercel --prod
 
 ## 4. Environment variables
 
-Seven credentials and two behaviour flags. Earlier versions of this document
+Eight credentials and two behaviour flags. Earlier versions of this document
 listed only two variables — that predates Reddit going live, the semantic
 scoring layer and the snapshot store.
+
+**Set `AUTH_USERS` before you deploy.** Every other credential below is
+optional — the app boots and runs fine without it, just with that source
+marked unavailable on screen. `AUTH_USERS` is different: this project is
+meant to be an internal RS tool, and a Vercel deployment URL is reachable by
+anyone who has it unless this is set. Leaving it blank means the dashboard —
+including every real comment, clip and message it has collected — is public.
 
 ### Credentials
 
 | Key | Unlocks | If you leave it blank |
 |---|---|---|
+| `AUTH_USERS` | **Required.** Comma-separated `username:password` pairs (e.g. `alice:correct-horse-battery,bob:another-passphrase`) — HTTP Basic Auth in front of every route, including the static dashboard | The deployment is publicly reachable with no login. Vercel's function logs print a loud warning at every cold start when this is the case. |
 | `ANTHROPIC_API_KEY` | Semantic sentiment (sarcasm, negation, gaming slang, non-English text), themes on live records, question and risk flags, and the AI daily briefing | Gaming-tuned lexicon fallback; live records carry no theme; no record-level risk flags, though theme-level risk detection still runs; the brief is computed from the figures and labelled as such on screen |
 | `YOUTUBE_API_KEY` | YouTube comments and video stats for the five tracked channels | YouTube absent from the dashboard — there is no YouTube sample data |
 | `REDDIT_CLIENT_ID` | Live Reddit via the official OAuth API (needs the secret too) | Labelled illustrative sample rows stand in, or nothing if `DEMO_DATA=false` |
@@ -233,9 +242,16 @@ Open `/api/health` on the deployment URL Vercel gave you. Expect roughly:
   },
   "semantic_analysis": { "configured": true, "model": "claude-opus-5" },
   "demo_data_enabled": true,
-  "storage": { "mode": "ephemeral", "directory": "/tmp/…", "snapshots_held": 0, "retention_days": 90, "durable": false }
+  "storage": { "mode": "ephemeral", "directory": "/tmp/…", "snapshots_held": 0, "retention_days": 90, "durable": false },
+  "access_control": { "configured": true, "user_count": 2 }
 }
 ```
+
+You need valid `AUTH_USERS` credentials just to load this page — `/api/health`
+is behind the same access control as every other route, deliberately, so an
+unauthenticated status check can't leak configuration state. If
+`access_control.configured` is `false`, stop here: the deployment is
+currently open to the public internet, and §4 above is what to fix.
 
 `configured` means the credentials are present, not that the last call
 succeeded. The `games` list is the union of the `game` values across all four
@@ -261,8 +277,9 @@ credentials problem. Per-source failures are listed in the red banner and in
 
 The other two endpoints are `/api/analysis` (the full payload; `?force=1`
 bypasses the cache) and `/api/methodology` (how every figure is calculated —
-static, no credentials needed, useful as a first smoke test because it works
-even with nothing configured).
+static, no *platform* credentials needed, useful as a first smoke test since
+it works even with nothing else configured). All three still need valid
+`AUTH_USERS` credentials if you've set them, same as every other route.
 
 ---
 

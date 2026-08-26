@@ -7,6 +7,13 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      # Internal access control — REQUIRED before this is reachable off your
+      # own machine. Comma-separated username:password pairs, e.g.
+      # "alice:correct-horse-battery,bob:another-passphrase". Left unset, the
+      # app still boots (it still boots with everything below unset too) but
+      # is wide open, with a loud warning in the logs saying so.
+      - key: AUTH_USERS
+        sync: false
       # Semantic sentiment + AI daily briefing. Without it the tool still runs,
       # falling back to the gaming-tuned lexicon and a computed brief.
       - key: ANTHROPIC_API_KEY

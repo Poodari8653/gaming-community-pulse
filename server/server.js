@@ -40,6 +40,7 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const express = require("express");
+const { buildAuth } = require("./lib/auth");
 const { resolveChannel, fetchRecentVideos, fetchCommentsMerged } = require("./lib/youtube");
 const { fetchChannelInfo, fetchChannelMessages } = require("./lib/discord");
 const { getAppAccessToken, resolveGameId, fetchTopClips, fetchLiveStreams } = require("./lib/twitch");
@@ -92,6 +93,14 @@ const TWITCH_CLIPS_WINDOW_DAYS = 30;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 let cache = { data: null, fetchedAt: 0 };
+
+// ---------------------------------------------------------------------------
+// Access control — this is an internal tool and must not be left open to the
+// internet. Gate every route, static assets included, before anything else.
+// See lib/auth.js for the full design notes.
+// ---------------------------------------------------------------------------
+const auth = buildAuth(process.env.AUTH_USERS);
+app.use(auth.middleware);
 
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "dashboard-live.html")));
@@ -650,6 +659,7 @@ app.get("/api/health", (req, res) => {
     semantic_analysis: { configured: nlp.isConfigured(), model: nlp.isConfigured() ? nlp.MODEL : null },
     demo_data_enabled: DEMO_DATA,
     storage: store.storageInfo(),
+    access_control: { configured: auth.configured, user_count: auth.userCount },
   });
 });
 
@@ -658,6 +668,21 @@ module.exports = app;
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Gaming Community Pulse running at http://localhost:${PORT}`);
+
+    if (!auth.configured) {
+      console.warn(
+        "\n" +
+        "*************************************************************************\n" +
+        "*  WARNING: AUTH_USERS is not set — this instance is WIDE OPEN, with no  *\n" +
+        "*  login required. Fine for local testing on your own machine. Before    *\n" +
+        "*  deploying anywhere reachable off your machine, set AUTH_USERS in      *\n" +
+        "*  .env (see server/.env.example) or this dashboard is public.          *\n" +
+        "*************************************************************************\n"
+      );
+    } else {
+      console.log(`Access control: ON — ${auth.userCount} user(s) configured via AUTH_USERS.`);
+    }
+
     const missing = [];
     if (!API_KEY) missing.push("YOUTUBE_API_KEY");
     if (!REDDIT_CLIENT_ID || !REDDIT_CLIENT_SECRET) missing.push("REDDIT_CLIENT_ID/SECRET");
