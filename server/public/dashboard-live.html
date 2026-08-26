@@ -43,17 +43,19 @@
   .filterbar{position:sticky;top:0;z-index:20;background:rgba(15,17,23,.96);
     backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:14px 28px}
   .filter-grid{display:grid;gap:14px 26px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:start}
+  .filter-group{display:block}
   .filter-group > .filter-label{display:block;font-size:11px;text-transform:uppercase;
     letter-spacing:.9px;color:var(--dim);margin-bottom:7px;font-weight:700}
-  .chips{display:flex;flex-wrap:wrap;gap:6px}
-  .chip{background:var(--panel);color:var(--muted);border:1px solid var(--border);
-    border-radius:999px;padding:6px 13px;font-size:13px}
-  .chip:hover{border-color:var(--accent);color:var(--text)}
-  .chip[aria-pressed="true"]{background:var(--accent);color:#0b0d13;border-color:var(--accent);font-weight:600}
-  .chip .count{opacity:.65;font-size:11px;margin-left:5px}
   select,input[type="date"],input[type="text"]{background:var(--panel);color:var(--text);
-    border:1px solid var(--border);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
+    border:1px solid var(--border);border-radius:8px;padding:8px 11px;font:inherit;font-size:13px}
+  select{width:100%;appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239aa1b4'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;padding-right:30px}
+  select:hover{border-color:var(--accent)}
+  .filter-grid select{max-width:260px}
   .range-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .range-row select{width:auto;min-width:130px;flex:0 0 auto}
+  .range-row input[type="date"]{flex:1 1 128px;min-width:128px}
   .filter-summary{margin-top:12px;font-size:12.5px;color:var(--muted)}
   .filter-summary b{color:var(--text)}
 
@@ -161,17 +163,17 @@
 <section class="filterbar" aria-label="Global dashboard filters">
   <div class="filter-grid">
     <div class="filter-group">
-      <span class="filter-label" id="lbl-channel">Media channel</span>
-      <div class="chips" id="channelFilter" role="group" aria-labelledby="lbl-channel"></div>
+      <label class="filter-label" for="channelFilter">Media channel</label>
+      <select id="channelFilter"><option value="">All channels</option></select>
     </div>
     <div class="filter-group">
-      <span class="filter-label" id="lbl-game">Product / game</span>
-      <div class="chips" id="gameFilter" role="group" aria-labelledby="lbl-game"></div>
+      <label class="filter-label" for="gameFilter">Product / game</label>
+      <select id="gameFilter"><option value="">All games</option></select>
     </div>
     <div class="filter-group">
-      <span class="filter-label" id="lbl-range">Time range</span>
-      <div class="range-row" role="group" aria-labelledby="lbl-range">
-        <div class="chips" id="rangeFilter"></div>
+      <label class="filter-label" for="rangeFilter">Time range</label>
+      <div class="range-row">
+        <select id="rangeFilter"></select>
         <label class="visually-hidden" for="rangeFrom">Custom start date</label>
         <input type="date" id="rangeFrom">
         <span aria-hidden="true" style="color:var(--dim)">→</span>
@@ -341,8 +343,8 @@
 let DATA = null;
 let RECORDS = [];
 const filters = {
-  channels: new Set(),   // empty = all
-  games: new Set(),      // empty = all
+  channel: "",   // "" = all
+  game: "",      // "" = all
   region: "",
   preset: "30d",
   from: null,
@@ -396,8 +398,8 @@ function activeWindow(){
 function filtered(){
   const w = activeWindow();
   return RECORDS.filter(r => {
-    if (filters.channels.size && !filters.channels.has(r.platform)) return false;
-    if (filters.games.size && !filters.games.has(r.game)) return false;
+    if (filters.channel && r.platform !== filters.channel) return false;
+    if (filters.game && r.game !== filters.game) return false;
     if (filters.region && r.region !== filters.region) return false;
     if (w.from || w.to){
       const d = dayOf(r.timestamp);
@@ -504,54 +506,31 @@ function clusterQuestions(rows){
 // ---------------------------------------------------------------------------
 // Filter UI
 // ---------------------------------------------------------------------------
-function chip(label, pressed, count){
-  return '<button type="button" class="chip" aria-pressed="' + (pressed?"true":"false") +
-    '" data-value="' + esc(label) + '">' + esc(label) +
-    (count != null ? '<span class="count">' + num(count) + '</span>' : '') + '</button>';
+function option(value, label, selected, count){
+  return '<option value="' + esc(value) + '"' + (selected ? " selected" : "") + '>' +
+    esc(label) + (count != null ? " (" + num(count) + ")" : "") + '</option>';
 }
 
 function buildFilters(){
   const counts = {};
   for (const r of RECORDS){ counts[r.platform] = (counts[r.platform]||0)+1; }
   const chEl = document.getElementById("channelFilter");
-  chEl.innerHTML = '<button type="button" class="chip" aria-pressed="' + (filters.channels.size===0) +
-    '" data-value="__all">All channels</button>' +
-    (DATA.platforms||[]).filter(p=>counts[p]).map(p=>chip(p, filters.channels.has(p), counts[p])).join("");
-  chEl.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
-    const v = b.dataset.value;
-    if (v === "__all") filters.channels.clear();
-    else { filters.channels.has(v) ? filters.channels.delete(v) : filters.channels.add(v); }
-    render();
-  }));
+  chEl.innerHTML = option("", "All channels", !filters.channel) +
+    (DATA.platforms||[]).filter(p=>counts[p]).map(p=>option(p, p, filters.channel===p, counts[p])).join("");
 
   const gCounts = {};
   for (const r of RECORDS){ gCounts[r.game] = (gCounts[r.game]||0)+1; }
   const gEl = document.getElementById("gameFilter");
-  gEl.innerHTML = '<button type="button" class="chip" aria-pressed="' + (filters.games.size===0) +
-    '" data-value="__all">All games</button>' +
-    (DATA.games||[]).filter(g=>gCounts[g]).map(g=>chip(g, filters.games.has(g), gCounts[g])).join("");
-  gEl.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
-    const v = b.dataset.value;
-    if (v === "__all") filters.games.clear();
-    else { filters.games.has(v) ? filters.games.delete(v) : filters.games.add(v); }
-    render();
-  }));
+  gEl.innerHTML = option("", "All games", !filters.game) +
+    (DATA.games||[]).filter(g=>gCounts[g]).map(g=>option(g, g, filters.game===g, gCounts[g])).join("");
 
   const rEl = document.getElementById("rangeFilter");
-  rEl.innerHTML = PRESETS.map(p =>
-    '<button type="button" class="chip" aria-pressed="' +
-    (!filters.from && filters.preset===p.id) + '" data-value="' + p.id + '">' + esc(p.label) + '</button>').join("");
-  rEl.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
-    filters.preset = b.dataset.value; filters.from = null; filters.to = null;
-    document.getElementById("rangeFrom").value = "";
-    document.getElementById("rangeTo").value = "";
-    render();
-  }));
+  rEl.innerHTML = PRESETS.map(p => option(p.id, p.label, !filters.from && filters.preset===p.id)).join("");
 
   const regions = [...new Set(RECORDS.map(r=>r.region))].sort();
   const regEl = document.getElementById("regionFilter");
-  regEl.innerHTML = '<option value="">All regions</option>' +
-    regions.map(r=>'<option value="'+esc(r)+'"'+(filters.region===r?" selected":"")+'>'+esc(r)+'</option>').join("");
+  regEl.innerHTML = option("", "All regions", !filters.region) +
+    regions.map(r=>option(r, r, filters.region===r)).join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -563,7 +542,7 @@ function renderBriefing(rows){
   // The notice must also fire when a time-range preset narrows the view. The
   // default preset is 30 days, so checking only for a custom date would leave
   // every panel showing a narrower window than the briefing, silently.
-  const isFiltered = filters.channels.size || filters.games.size || filters.region ||
+  const isFiltered = filters.channel || filters.game || filters.region ||
     filters.from || rows.length < RECORDS.length;
 
   let html = "";
@@ -780,12 +759,12 @@ function renderTwitch(){
   // A live-viewer snapshot has no history, so the time-range and region filters
   // cannot apply to it. The media-channel filter can and must: if the user has
   // excluded Twitch, a Twitch panel should not be on screen at all.
-  const channelExcluded = filters.channels.size && !filters.channels.has("Twitch");
+  const channelExcluded = filters.channel && filters.channel !== "Twitch";
   panel.style.display = channelExcluded ? "none" : "";
   if (channelExcluded) return;
 
   const snap = (DATA && DATA.twitch_live) || [];
-  const shown = filters.games.size ? snap.filter(s=>filters.games.has(s.game)) : snap;
+  const shown = filters.game ? snap.filter(s=>s.game===filters.game) : snap;
   document.getElementById("twitchLive").innerHTML = shown.length ? shown.map(s =>
     '<div class="card"><div><b>' + esc(s.game) + '</b></div><div class="card-meta">' +
     '<span class="pill">' + num(s.liveChannelCount) + ' channels live</span>' +
@@ -822,8 +801,8 @@ function renderRawTable(rows){
 
 function renderFilterSummary(rows){
   const w = activeWindow();
-  const ch = filters.channels.size ? [...filters.channels].join(", ") : "all channels";
-  const gm = filters.games.size ? [...filters.games].join(", ") : "all games";
+  const ch = filters.channel || "all channels";
+  const gm = filters.game || "all games";
   const rg = filters.region || "all regions";
   const rangeTxt = (w.from && w.to) ? (w.from + " to " + w.to) : "all time";
   document.getElementById("filterSummary").innerHTML =
@@ -987,6 +966,14 @@ document.getElementById("refreshBtn").addEventListener("click", () => load(true)
 document.getElementById("searchBox").addEventListener("input", () => renderRawTable(filtered()));
 document.getElementById("sentimentFilter").addEventListener("change", () => renderRawTable(filtered()));
 document.getElementById("provenanceFilter").addEventListener("change", () => renderRawTable(filtered()));
+document.getElementById("channelFilter").addEventListener("change", e => { filters.channel = e.target.value; render(); });
+document.getElementById("gameFilter").addEventListener("change", e => { filters.game = e.target.value; render(); });
+document.getElementById("rangeFilter").addEventListener("change", e => {
+  filters.preset = e.target.value; filters.from = null; filters.to = null;
+  document.getElementById("rangeFrom").value = "";
+  document.getElementById("rangeTo").value = "";
+  render();
+});
 document.getElementById("regionFilter").addEventListener("change", e => { filters.region = e.target.value; render(); });
 document.getElementById("rangeFrom").addEventListener("change", e => { filters.from = e.target.value || null; render(); });
 document.getElementById("rangeTo").addEventListener("change", e => { filters.to = e.target.value || null; render(); });
