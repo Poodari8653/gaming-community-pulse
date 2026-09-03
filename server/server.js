@@ -28,7 +28,9 @@
 //                against the most recent earlier one to produce deltas.
 //
 //   5. BRIEF     lib/briefing.js writes the daily narrative from the finished
-//                analysis.
+//                analysis, and lib/gemini.js runs a second, independent AI
+//                pass — Gemini, not Claude — that clusters each game's live
+//                Reddit discussion into sub-topics with grounded quotes.
 //
 //   6. SERVE     /api/analysis returns aggregates AND the row-level records,
 //                so the dashboard's three global filters (media channel,
@@ -52,6 +54,7 @@ const { classifyRegion, REGIONS, METHODOLOGY: REGION_METHODOLOGY } = require("./
 const analytics = require("./lib/analytics");
 const store = require("./lib/store");
 const { generateBriefing, TARGET_WORDS } = require("./lib/briefing");
+const gemini = require("./lib/gemini");
 
 const channelConfig = require("./config/channels.json");
 const discordChannelConfig = require("./config/discord_channels.json");
@@ -572,6 +575,13 @@ async function refresh() {
   // 5. BRIEF
   analysis.briefing = await generateBriefing(analysis);
 
+  // 5b. DISCUSS — a second, independent AI pass (Gemini, not Claude) that
+  // clusters each game's live Reddit discussion into sub-topics with
+  // grounded quotes. Runs over rd.rows specifically — real collected Reddit
+  // records only, never the illustrative sample — so every quote this panel
+  // shows links to an actual public post or comment.
+  analysis.reddit_discussion_summaries = await gemini.generateDiscussionSummaries(rd.rows);
+
   // 6. SERVE — records ride along so all three global filters work client-side.
   analysis.records = rows;
 
@@ -670,6 +680,7 @@ app.get("/api/health", (req, res) => {
       twitch: { configured: Boolean(TWITCH_CLIENT_ID && TWITCH_CLIENT_SECRET), categories: twitchGameConfig.length },
     },
     semantic_analysis: { configured: nlp.isConfigured(), model: nlp.isConfigured() ? nlp.MODEL : null },
+    discussion_summary: { configured: gemini.isConfigured(), model: gemini.isConfigured() ? gemini.MODEL : null, engine: "Gemini", scope: "Reddit only" },
     demo_data_enabled: DEMO_DATA,
     storage: store.storageInfo(),
     access_control: {
@@ -719,6 +730,7 @@ if (require.main === module) {
     if (!DISCORD_TOKEN) missing.push("DISCORD_BOT_TOKEN");
     if (!TWITCH_CLIENT_ID || !TWITCH_CLIENT_SECRET) missing.push("TWITCH_CLIENT_ID/SECRET");
     if (!process.env.ANTHROPIC_API_KEY) missing.push("ANTHROPIC_API_KEY (semantic sentiment + AI briefing)");
+    if (!process.env.GEMINI_API_KEY) missing.push("GEMINI_API_KEY (Reddit discussion-summary panel)");
     if (missing.length) {
       console.warn(`Not configured: ${missing.join(", ")}. See server/.env.example — the dashboard still runs, with those sources marked unavailable.`);
     }

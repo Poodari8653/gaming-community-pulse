@@ -39,6 +39,11 @@ services:
         sync: false
       - key: TWITCH_CLIENT_SECRET
         sync: false
+      # A second, independent AI pass (Gemini, not Claude) that clusters live
+      # Reddit discussion into sub-topics with grounded quotes. Optional —
+      # without it, only that one dashboard panel is unavailable.
+      - key: GEMINI_API_KEY
+        sync: false
       # Set to "false" to exclude the illustrative sample data entirely.
       - key: DEMO_DATA
         value: "true"

@@ -259,6 +259,20 @@ Runs when `ANTHROPIC_API_KEY` is unset, the model call errors, or the model refu
 
 ---
 
+## 10a. Reddit discussion clustering (`lib/gemini.js`)
+
+A second, independent AI pass over live data — Google Gemini, not Claude — feeding the dashboard's "Top discussions (Reddit)" panel. Deliberately separate from the sentiment/briefing pipeline above: unrelated credential (`GEMINI_API_KEY`, unrelated to `ANTHROPIC_API_KEY`), unrelated purpose (topic clustering in the community's own terms, not the fixed 17-item theme vocabulary), and a talks-to-Gemini-directly-over-`fetch` implementation with no SDK dependency, matching every platform wrapper in this codebase (`youtube.js`, `reddit.js`, `discord.js`, `twitch.js`).
+
+- **API**: Google's Gemini Interactions API, `POST https://generativelanguage.googleapis.com/v1beta/interactions`, auth via `x-goog-api-key` header. Model: `gemini-3.8-flash` by default (`GEMINI_MODEL` override, same pattern as `ANTHROPIC_MODEL`). Structured output enforced via `response_format: { type: "text", mime_type: "application/json", schema }`.
+- **Scope, by product decision**: Reddit only, and only the live rows `collectReddit()` returned this refresh (`rd.rows`) — never the illustrative sample. Clustering sample text and presenting it as real community discussion would be a materially worse failure than the panel simply saying a game doesn't have enough Reddit volume yet.
+- **Grounding is the core design constraint.** Gemini is shown a numbered list of records — `{ id, text (≤300 chars), score }`, explicitly *without* the URL — and asked only to (a) name 3–5 sub-topics present in the data and (b) list which record ids best represent each one (`quote_ids`, 2–4 per cluster). The model is never asked to produce quote text, and the system prompt states this directly: *"Never write out the quote text yourself — you are selecting existing records, not quoting from memory."* The application then looks up the real text and the real `reddit.com` permalink for each returned id from its own already-collected data. An id the model returns that doesn't match a real record is silently dropped, never fabricated into a placeholder quote; a cluster left with zero resolvable quotes is dropped entirely rather than shown with no evidence behind it. This means the panel's links are exactly as trustworthy as `top_posts`' links — both are read from collected data, never model output — even though the *clustering judgement* (which sub-topics exist, which records best represent them) is entirely the model's.
+- **Selection bias, by design**: the up-to-60 records sent per game are the highest-scored (most-upvoted) ones for that game this refresh, mirroring what a human moderator skimming "sort by top" would actually see — not a random or chronological sample.
+- **Minimum volume**: fewer than 6 live Reddit records for a game and clustering is skipped for that game (`available: false`, with a specific reason), on the reasoning that clustering 3-4 records into "3-5 sub-topics" produces noise dressed as insight, not a genuine finding.
+- **Failure handling**: matches the rest of the codebase's fail-open-with-a-reason pattern (compare `briefing.js`'s fallback path) — an unset key, insufficient volume, and an API error (rate limit, bad key, model error) each return the same `{ game, available: false, reason }` shape rather than throwing, so one game's clustering failure never takes down `/api/analysis` for the others.
+- **Cost control**: runs once per game per `refresh()` call (so, subject to the same 5-minute `/api/analysis` cache as everything else), with no additional caching of its own beyond that — the same choice `briefing.js` makes, and for the same reason: the outer cache is the cost control, a second cache layer would just add complexity for a call that's already infrequent.
+
+---
+
 ## 11. Data collection per platform
 
 | Platform | Module | Auth | What's pulled | Per-refresh volume |
@@ -344,9 +358,9 @@ middleware explicitly lets through.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/analysis` | Runs the full 6-stage pipeline (or serves the 5-minute cache); returns aggregates, row-level records, videos, Twitch live snapshot, Reddit community info, data-source statuses, fetch errors, sentiment-engine stats, storage info, deltas, and the AI briefing. `?force=1` bypasses the cache. |
+| `GET /api/analysis` | Runs the full 6-stage pipeline (or serves the 5-minute cache); returns aggregates, row-level records, videos, Twitch live snapshot, Reddit community info, Gemini's per-game Reddit discussion clusters, data-source statuses, fetch errors, sentiment-engine stats, storage info, deltas, and the AI briefing. `?force=1` bypasses the cache. |
 | `GET /api/methodology` | Machine-readable documentation of the engagement formula, region signal precedence, sentiment engines/scale, the 6-stage data flow, and briefing length rationale — rendered live in the dashboard's "How is this calculated?" panel rather than requiring a separate doc. |
-| `GET /api/health` | Configuration status per platform, semantic-analysis engine/model, `demo_data_enabled`, and snapshot storage info. |
+| `GET /api/health` | Configuration status per platform, semantic-analysis engine/model, discussion-summary (Gemini) engine/model, `demo_data_enabled`, and snapshot storage info. |
 
 ---
 
@@ -354,7 +368,7 @@ middleware explicitly lets through.
 
 - Single-file HTML/CSS/JS, Chart.js **vendored locally** (`server/public/vendor/chart.umd.min.js`, refreshed via `npm run postinstall` → `server/scripts/vendor-chartjs.js`) rather than loaded from a CDN, so the dashboard renders on an egress-restricted internal network.
 - **Global sticky filter bar**: channel (platform), game, and time-range — all three apply client-side to every panel below, computed from the row-level `records` the API already returned (no extra round trip per filter change).
-- **Panels**: Today's briefing → KPI row → Discussion volume & sentiment over time → Sentiment mix by game → Engagement Index by game → How the channels differ (platform breakdown) → Recurring themes → Publication region → Recurring questions → Highest-impact posts → Twitch live-right-now → Browse the underlying records (raw table) → live "How is this calculated?" methodology panel.
+- **Panels**: Today's briefing → KPI row → Discussion volume & sentiment over time → Sentiment mix by game → Engagement Index by game → How the channels differ (platform breakdown) → Recurring themes → Publication region → Recurring questions → Highest-impact posts → Twitch live-right-now → Top discussions (Reddit, Gemini-clustered) → Browse the underlying records (raw table) → live "How is this calculated?" methodology panel.
 - **Accessibility**: ARIA roles/labels throughout (`role="status"`, `role="group"`, `role="img"` with descriptive `aria-label` on each chart canvas, `aria-live="polite"` on the briefing/filter-summary/loading regions, `aria-pressed` on filter chips), and `@media (prefers-reduced-motion: reduce)` disables the loading spinner's animation.
 
 ---
@@ -362,7 +376,7 @@ middleware explicitly lets through.
 ## 15. Stack & dependencies
 
 - **Runtime**: Node.js ≥18, Express 4.
-- **AI**: `@anthropic-ai/sdk` (^0.68.0) — Claude Opus 5 by default, used for both semantic sentiment scoring and the daily briefing.
+- **AI**: `@anthropic-ai/sdk` (^0.68.0) — Claude Opus 5 by default, used for both semantic sentiment scoring and the daily briefing. Separately, `lib/gemini.js` talks to Google's Gemini Interactions API directly over `fetch` (no SDK dependency) — `gemini-3.8-flash` by default — for the Reddit discussion-clustering panel only.
 - **Charting**: Chart.js (^4.4.1), vendored (not CDN-loaded).
 - **CSV parsing**: `csv-parse` (^5.5.6) for the sample dataset.
 - **Config**: `dotenv` (^16.4.5), loaded relative to `server.js`'s own directory (not the process working directory), so behaviour doesn't depend on where the process is launched from.
@@ -382,3 +396,4 @@ Collected here from each module's own documented caveats, so nothing is overstat
 - The lexicon sentiment fallback cannot reliably resolve genuine sarcasm/irony — that's precisely why the semantic (Claude) engine exists as the primary path.
 - Deltas and spike detection both require enough historical snapshots/weeks to be meaningful — a fresh deployment with no prior snapshot correctly reports "not available yet" rather than a fabricated comparison.
 - Ephemeral snapshot storage (e.g. on Vercel's serverless filesystem, if `SNAPSHOT_DIR` isn't pointed at a mounted volume) won't survive a cold start, and the dashboard reports this via `storage.durable` rather than silently losing history.
+- Reddit discussion clustering only ever describes real, live Reddit rows — never the illustrative sample — so a game with too little live Reddit volume this refresh (or Reddit not configured at all) reports itself unavailable rather than clustering placeholder text and presenting it as real discussion.

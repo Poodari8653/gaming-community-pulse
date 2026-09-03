@@ -60,6 +60,7 @@ Add environment variables one at a time, then redeploy so they take effect:
 npx vercel env add AUTH_USERS production
 npx vercel env add SESSION_SECRET production
 npx vercel env add ANTHROPIC_API_KEY production
+npx vercel env add GEMINI_API_KEY production
 npx vercel env add YOUTUBE_API_KEY production
 # …and so on for each variable in §4
 npx vercel --prod
@@ -69,9 +70,10 @@ npx vercel --prod
 
 ## 4. Environment variables
 
-Nine credentials and two behaviour flags. Earlier versions of this document
+Ten credentials and two behaviour flags. Earlier versions of this document
 listed only two variables — that predates Reddit going live, the semantic
-scoring layer, the snapshot store, and the login form.
+scoring layer, the snapshot store, the login form, and the Gemini discussion
+panel.
 
 **Set `AUTH_USERS` and `SESSION_SECRET` before you deploy.** Every other
 credential below is optional — the app boots and runs fine without it, just
@@ -102,6 +104,7 @@ instance verifies the same cookies.
 | `DISCORD_BOT_TOKEN` | Live Discord messages from channels the bot has been invited to | Labelled illustrative sample rows stand in, or nothing if `DEMO_DATA=false` |
 | `TWITCH_CLIENT_ID` | Twitch top clips and the live-viewer snapshot (needs the secret too) | Twitch absent — there is no Twitch sample data |
 | `TWITCH_CLIENT_SECRET` | As above | As above |
+| `GEMINI_API_KEY` | The "Top discussions" panel — a second, independent AI pass (Gemini, not Claude) that clusters each game's live Reddit discussion into sub-topics with grounded quotes. Needs `REDDIT_CLIENT_ID`/`SECRET` too, since it clusters live Reddit rows only, never the sample. | Just that one panel is unavailable; every other panel, including Claude's own sentiment and theme detection, is unaffected |
 
 ### Behaviour flags
 
@@ -252,6 +255,7 @@ Open `/api/health` on the deployment URL Vercel gave you. Expect roughly:
     "twitch":  { "configured": true, "categories": 5 }
   },
   "semantic_analysis": { "configured": true, "model": "claude-opus-5" },
+  "discussion_summary": { "configured": true, "model": "gemini-3.8-flash", "engine": "Gemini", "scope": "Reddit only" },
   "demo_data_enabled": true,
   "storage": { "mode": "ephemeral", "directory": "/tmp/…", "snapshots_held": 0, "retention_days": 90, "durable": false },
   "access_control": { "configured": true, "user_count": 2, "login_url": "/login", "session_secret_set": true }
