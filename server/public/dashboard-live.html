@@ -291,8 +291,8 @@
   </section>
 
   <section class="panel" id="discussionsPanel" aria-labelledby="disc-h">
-    <h2 id="disc-h">Top discussions (Reddit)</h2>
-    <p class="desc">A second, independent AI pass — Gemini, not Claude — clusters each game's live Reddit discussion into the sub-topics people are actually talking about right now. Gemini only picks which real posts and comments represent each cluster; it never writes the quote text or link itself, so every quote below traces back to an actual public Reddit record.</p>
+    <h2 id="disc-h">Top discussions</h2>
+    <p class="desc">A second, independent AI pass — Gemini, not Claude — clusters each game's live discussion, across whichever platforms are actually configured, into the sub-topics people are actually talking about right now. Gemini only picks which real records represent each cluster; it never writes the quote text or link itself, so every quote below traces back to an actual public post, comment or clip. Illustrative sample data is never included.</p>
     <div id="discussionsBody"></div>
   </section>
 
@@ -782,59 +782,75 @@ function renderTwitch(){
 }
 
 function renderDiscussions(){
-  const panel = document.getElementById("discussionsPanel");
-  // Reddit-only feature: if the media-channel filter has excluded Reddit,
-  // there is nothing honest to show, same logic as the Twitch panel above.
-  const channelExcluded = filters.channel && filters.channel !== "Reddit";
-  panel.style.display = channelExcluded ? "none" : "";
-  if (channelExcluded) return;
-
-  const all = (DATA && DATA.reddit_discussion_summaries) || [];
-  const shown = filters.game ? all.filter(s => s.game === filters.game) : all;
   const el = document.getElementById("discussionsBody");
+  const all = (DATA && DATA.discussion_summaries) || [];
+  const shown = filters.game ? all.filter(s => s.game === filters.game) : all;
 
   if (!shown.length){
-    el.innerHTML = '<p class="empty">No live Reddit data to cluster yet' +
+    el.innerHTML = '<p class="empty">No live data to cluster yet' +
       (filters.game ? " for " + esc(filters.game) : "") + '.</p>';
     return;
   }
 
   const allUnconfigured = shown.every(s => !s.available && /not configured/i.test(s.reason || ""));
   if (allUnconfigured){
-    el.innerHTML = '<p class="empty">GEMINI_API_KEY is not configured — this panel clusters live Reddit discussion into sub-topics once it is set. See server/.env.example.</p>';
+    el.innerHTML = '<p class="empty">GEMINI_API_KEY is not configured — this panel clusters live discussion into sub-topics once it is set. See server/.env.example.</p>';
     return;
   }
 
+  // Clustering already happened server-side across all live platforms
+  // together, so the media-channel filter is applied here by filtering the
+  // quotes within each cluster down to that one platform, then dropping any
+  // cluster (or game) left with nothing to show — re-clustering per filter
+  // change isn't practical without another Gemini call per keystroke.
   let modelNote = null;
   const html = shown.map(s => {
     let body;
     if (!s.available){
       body = '<p class="empty">' + esc(s.reason || "Not available.") + '</p>';
     } else {
-      modelNote = s.generated_by;
-      body = s.clusters.map(c =>
-        '<div class="brief-item" style="margin-bottom:10px">' +
-          '<div class="t">' + esc(c.title) + '</div>' +
-          '<div class="d">' + esc(c.summary) + '</div>' +
-          '<div style="margin-top:8px">' +
-            c.quotes.map(q =>
-              '<div class="card" style="font-size:12.5px">“' + esc(q.text) + '”' +
-              '<div class="card-meta">' +
-                (q.source ? '<span class="pill">' + esc(q.source) + '</span>' : "") +
-                '<span class="pill">score ' + num(q.score) + '</span>' +
-                (q.url ? '<a href="' + esc(q.url) + '" target="_blank" rel="noopener">source</a>' : "") +
-              '</div></div>'
-            ).join("") +
-          '</div>' +
-        '</div>'
-      ).join("") || '<p class="empty">Clustered, but no sub-topic had a quote that survived grounding.</p>';
+      const clusters = s.clusters
+        .map(c => ({
+          title: c.title,
+          summary: c.summary,
+          quotes: filters.channel ? c.quotes.filter(q => q.platform === filters.channel) : c.quotes,
+        }))
+        .filter(c => c.quotes.length > 0);
+
+      if (!clusters.length){
+        body = '<p class="empty">' + (filters.channel
+          ? "No " + esc(filters.channel) + " quotes survived grounding in this game's clusters."
+          : "Clustered, but no sub-topic had a quote that survived grounding.") + '</p>';
+      } else {
+        modelNote = s.generated_by;
+        body = clusters.map(c =>
+          '<div class="brief-item" style="margin-bottom:10px">' +
+            '<div class="t">' + esc(c.title) + '</div>' +
+            '<div class="d">' + esc(c.summary) + '</div>' +
+            '<div style="margin-top:8px">' +
+              c.quotes.map(q =>
+                '<div class="card" style="font-size:12.5px">“' + esc(q.text) + '”' +
+                '<div class="card-meta">' +
+                  (q.platform ? '<span class="pill">' + esc(q.platform) + '</span>' : "") +
+                  (q.source ? '<span class="pill">' + esc(q.source) + '</span>' : "") +
+                  '<span class="pill">score ' + num(q.score) + '</span>' +
+                  (q.url ? '<a href="' + esc(q.url) + '" target="_blank" rel="noopener">source</a>' : "") +
+                '</div></div>'
+              ).join("") +
+            '</div>' +
+          '</div>'
+        ).join("");
+      }
     }
-    return '<div style="margin-bottom:22px"><h3>' + esc(s.game) + '</h3>' + body + '</div>';
+    const platformNote = (s.available && s.platforms && s.platforms.length)
+      ? s.platforms.map(p => '<span class="pill">' + esc(p) + '</span>').join("")
+      : "";
+    return '<div style="margin-bottom:22px"><h3>' + esc(s.game) + ' ' + platformNote + '</h3>' + body + '</div>';
   }).join("");
 
   el.innerHTML = html + (modelNote
     ? '<p class="brief-meta">Generated by ' + esc(modelNote) +
-      ' · quotes are read back verbatim from the actual collected records, never model-written · Reddit only.</p>'
+      ' · quotes are read back verbatim from the actual collected records, never model-written · live platforms only, never the illustrative sample.</p>'
     : "");
 }
 

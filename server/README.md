@@ -135,7 +135,7 @@ Every variable in `.env.example`, what it unlocks, and what happens without it.
 | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` | Live Reddit via the official OAuth API — top posts of the week plus recent comments per configured subreddit | With `DEMO_DATA=true`, 295 labelled illustrative sample rows stand in. With `DEMO_DATA=false`, no Reddit data at all. |
 | `DISCORD_BOT_TOKEN` | Live Discord via the bot REST API — recent messages and reaction counts from channels the bot has been invited to, plus the guild's `preferred_locale` | With `DEMO_DATA=true`, 157 labelled illustrative sample rows stand in. With `DEMO_DATA=false`, no Discord data at all. |
 | `TWITCH_CLIENT_ID` + `TWITCH_CLIENT_SECRET` | Twitch Helix — top clips per game category (last 30 days) and a live-viewer snapshot | No Twitch records and an empty "Twitch — live right now" panel. There are **no** Twitch sample rows. |
-| `GEMINI_API_KEY` | The "Top discussions (Reddit)" panel — Google Gemini clusters each game's live Reddit posts/comments into sub-topics with grounded quotes. Needs `REDDIT_CLIENT_ID`/`SECRET` too, since it only ever clusters live Reddit rows, never the sample. See §3a. | Just that one panel reports itself unavailable, per game, with a reason. Every other panel — including Claude's own sentiment and theme detection — is completely unaffected. |
+| `GEMINI_API_KEY` | The "Top discussions" panel — Google Gemini clusters each game's live records, across whichever of YouTube/Reddit/Discord/Twitch are configured, into sub-topics with grounded quotes. Never clusters the illustrative sample; a platform with no credentials just doesn't contribute records. See §3a. | Just that one panel reports itself unavailable, per game, with a reason. Every other panel — including Claude's own sentiment and theme detection — is completely unaffected. |
 
 Both halves of a pair are required. `REDDIT_CLIENT_ID` without
 `REDDIT_CLIENT_SECRET` counts as unconfigured, and likewise for Twitch.
@@ -163,31 +163,52 @@ Both halves of a pair are required. `REDDIT_CLIENT_ID` without
 
 `lib/gemini.js` is a second, independent AI pass, deliberately separate from
 the Claude-based sentiment/theme pipeline in `lib/nlp.js`. Given a game's live
-Reddit posts and comments, it groups them into a handful of sub-topics — in
-the community's own terms ("Developer Responsiveness", "Character Skins and
-Rarity"), not the dashboard's fixed 17-item theme vocabulary — and shows real
-quotes under each one.
+records — from whichever of YouTube, Reddit, Discord and Twitch are actually
+configured and returning data this refresh, combined — it groups them into a
+handful of sub-topics in the community's own terms ("Developer
+Responsiveness", "Character Skins and Rarity"), not the dashboard's fixed
+17-item theme vocabulary, and shows real quotes under each one.
 
 **Gemini never writes the quote text or the link.** It is shown a numbered
-list of real Reddit records (id, text, score — no URL) and asked only to name
-the sub-topics present and say which record ids best represent each one. The
-actual quote text and `reddit.com` permalink are then read back out of our own
+list of real records (id, platform, text, score — no URL) and asked only to
+name the sub-topics present and say which record ids best represent each one.
+The actual quote text, link and source are then read back out of our own
 collected data by that id, never taken from the model's response. An id the
 model invents that doesn't exist in the input is silently dropped rather than
-shown. This matters specifically here: an LLM asked to "quote Reddit" will
-happily fabricate a plausible-looking comment and permalink, and a fabricated
+shown. This matters specifically here: an LLM asked to "quote the community"
+will happily fabricate a plausible-looking comment and link, and a fabricated
 link in a marketing dashboard is a much worse failure than an imperfect
 cluster label.
 
 Other rules worth knowing:
 
-- **Reddit only.** This panel never reads YouTube, Discord or Twitch text.
-- **Never the sample.** It clusters `rd.rows` specifically — the raw output of
-  `collectReddit()` — never the illustrative sample rows `loadSampleRows()`
-  adds elsewhere. If Reddit isn't configured, or a game has too little live
-  Reddit volume (fewer than 6 records) to cluster meaningfully, that game's
-  panel reports itself unavailable with the specific reason, rather than
-  clustering sample text and presenting it as real discussion.
+- **No platform is hardcoded.** `lib/gemini.js` doesn't know or care which
+  platform a record came from beyond tagging it for attribution. `server.js`
+  decides what's "live" by passing it the combined raw output of whichever
+  collectors ran this refresh — `collectYouTube().rows`,
+  `collectReddit().rows`, `collectDiscord().rows`, `collectTwitch().rows` — so
+  whichever platforms are actually configured is exactly what gets clustered.
+  A game with only Reddit configured gets Reddit-only clusters; a game with
+  all four gets a genuinely cross-platform view, with each quote tagged by
+  its platform in the UI. Each cluster's parent record also reports a
+  `platforms` array listing every platform that contributed to it.
+- **Never the sample.** The rows passed in are always pre-sample-merge raw
+  collector output, never the illustrative sample rows `loadSampleRows()`
+  adds elsewhere. If none of the four platforms are configured, or a game has
+  too little combined live volume (fewer than 6 records) to cluster
+  meaningfully, that game's panel reports itself unavailable with the
+  specific reason, rather than clustering sample text and presenting it as
+  real discussion.
+- **Twitch text is clip titles, not player commentary.** The system prompt
+  tells the model this explicitly, since a clip title is streamer/clipper
+  promotional framing, not community sentiment, and shouldn't be allowed to
+  dominate a cluster meant to represent what players themselves are saying.
+- **The ranking metric isn't cross-platform-comparable.** Records are
+  ranked by their own `score` field to decide which ~60 to send the model per
+  game — Reddit upvotes, YouTube likes, Discord reaction count, Twitch view
+  count. That's a reasonable "which are worth featuring" signal within a
+  mixed pool, but it is not the same thing as the platform-normalised
+  Engagement Index used everywhere else on the dashboard.
 - **Independent of `ANTHROPIC_API_KEY`.** Gemini and Claude are unrelated
   credentials for unrelated features; either can be configured without the
   other.
@@ -299,15 +320,16 @@ to the semantic API**.
 The full payload the dashboard renders: `overall`, `games_summary`,
 `platform_summary`, `region_summary`, `themes`, `risks`, `spikes`,
 `daily_series`, `weekly_series`, `recurring_questions`, `top_posts`, `videos`,
-`twitch_live`, `reddit_communities`, `reddit_discussion_summaries`,
-`data_sources`, `fetch_errors`, `sentiment_engine`, `storage`, `provenance`,
-`deltas`, `briefing`, and `records` (every row, so the global filters work
+`twitch_live`, `reddit_communities`, `discussion_summaries`, `data_sources`,
+`fetch_errors`, `sentiment_engine`, `storage`, `provenance`, `deltas`,
+`briefing`, and `records` (every row, so the global filters work
 client-side).
 
-`reddit_discussion_summaries` is one entry per game with any live Reddit data:
-`{ game, available, clusters, generated_by }` when Gemini ran, or
-`{ game, available: false, reason }` when it didn't (unconfigured, too little
-volume, or an API error) — see §3a.
+`discussion_summaries` is one entry per game with any live data on any
+platform: `{ game, available, clusters, generated_by, platforms }` when
+Gemini ran (`platforms` lists which of YouTube/Reddit/Discord/Twitch actually
+contributed records), or `{ game, available: false, reason }` when it didn't
+(unconfigured, too little combined volume, or an API error) — see §3a.
 
 Results are cached in memory for **5 minutes**. Append `?force=1` to bypass the
 cache and run a full collection — this is what the dashboard's "Refresh data"
@@ -343,7 +365,7 @@ Deployment check. Returns:
     "twitch":  { "configured": true,  "categories": 5 }
   },
   "semantic_analysis": { "configured": true, "model": "claude-opus-5" },
-  "discussion_summary": { "configured": true, "model": "gemini-3.8-flash", "engine": "Gemini", "scope": "Reddit only" },
+  "discussion_summary": { "configured": true, "model": "gemini-3.8-flash", "engine": "Gemini", "scope": "All live platforms (never sample)" },
   "demo_data_enabled": true,
   "storage": {
     "mode": "repo",
@@ -517,8 +539,8 @@ copy is expected to be in the repository already.
 | Startup logs "Not configured: …" | Expected with an empty `.env`. Those sources are skipped; everything else still runs. |
 | Sentiment banner says "gaming-tuned lexicon fallback" | `ANTHROPIC_API_KEY` is unset or the `@anthropic-ai/sdk` package is missing. The banner reflects only whether the key and SDK are present — if the key is set but batches are failing, the banner still names the model, so check `sentiment_engine.errors` and `sentiment_engine.fallback` in `/api/analysis`, and the per-record `sentiment_method`, to see what was actually scored semantically. |
 | Themes panel looks thin, or only shows sample data | Themes on live records come from the semantic layer. Without `ANTHROPIC_API_KEY`, live rows carry no theme. |
-| "Top discussions (Reddit)" panel says "not configured" | `GEMINI_API_KEY` is unset (§3a). Unrelated to `ANTHROPIC_API_KEY` — set them independently. |
-| "Top discussions" shows a game as "Not enough Reddit volume to cluster" | That game had fewer than 6 live Reddit records this refresh — expected for a lightly-discussed title or a narrow time window. It clusters live Reddit rows only, never the sample. |
+| "Top discussions" panel says "not configured" | `GEMINI_API_KEY` is unset (§3a). Unrelated to `ANTHROPIC_API_KEY` — set them independently. |
+| "Top discussions" shows a game as "Not enough live discussion volume to cluster" | That game had fewer than 6 combined live records across every configured platform this refresh — expected for a lightly-discussed title or a narrow time window. It clusters live rows only, never the sample. |
 | "Top discussions" shows "Gemini clustering failed: …" | The error after the colon is Gemini's own response (rate limit, invalid key, model name). Check `GEMINI_API_KEY` and `GEMINI_MODEL` in `.env`. |
 | `Reddit auth failed: …` | Wrong client ID/secret, or the app at reddit.com/prefs/apps is not of type "script". A generic User-Agent can also be rejected — set `REDDIT_USER_AGENT`. |
 | Discord returns messages with empty text | **Message Content Intent** is not enabled in the Developer Portal (app → Bot → Privileged Gateway Intents). The call succeeds but content comes back blank. |

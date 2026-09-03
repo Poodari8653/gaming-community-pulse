@@ -93,7 +93,7 @@ Render will happily let you skip them.
 | `DISCORD_BOT_TOKEN` | Live Discord from channels the bot has joined | Labelled sample rows stand in, or nothing if `DEMO_DATA=false` |
 | `TWITCH_CLIENT_ID` | Twitch clips and live-viewer snapshot (with the secret below) | Twitch absent — there is no Twitch sample data |
 | `TWITCH_CLIENT_SECRET` | Twitch clips and live-viewer snapshot (with the ID above) | As above |
-| `GEMINI_API_KEY` | The "Top discussions" panel — a second, independent AI pass (Gemini, not Claude) that clusters each game's live Reddit discussion into sub-topics with grounded quotes | Just that one panel is unavailable; everything else, including Claude's own sentiment and theme detection, is unaffected |
+| `GEMINI_API_KEY` | The "Top discussions" panel — a second, independent AI pass (Gemini, not Claude) that clusters each game's live discussion, across whichever of YouTube/Reddit/Discord/Twitch are configured, into sub-topics with grounded quotes | Just that one panel is unavailable; everything else, including Claude's own sentiment and theme detection, is unaffected |
 
 Two behaviour flags are already set in `render.yaml` and can be edited in the
 same tab:
@@ -185,7 +185,7 @@ like:
     "twitch":  { "configured": true, "categories": 5 }
   },
   "semantic_analysis": { "configured": true, "model": "claude-opus-5" },
-  "discussion_summary": { "configured": true, "model": "gemini-3.8-flash", "engine": "Gemini", "scope": "Reddit only" },
+  "discussion_summary": { "configured": true, "model": "gemini-3.8-flash", "engine": "Gemini", "scope": "All live platforms (never sample)" },
   "demo_data_enabled": true,
   "storage": { "mode": "configured", "directory": "/var/data/snapshots", "snapshots_held": 1, "retention_days": 90, "durable": true },
   "access_control": { "configured": true, "user_count": 2, "login_url": "/login", "session_secret_set": true }
