@@ -19,13 +19,22 @@
 //
 // GROUNDING, NOT GENERATION. Gemini never writes the quote text or the URL
 // itself. It is shown a numbered list of real records (id, platform, text,
-// score — no URL) and asked only to (a) name the sub-topics present and
-// (b) say which record ids best represent each one. The actual quote text,
-// link and source are then read back out of our own collected data by that
-// id, never out of the model's response. This matters specifically for this
-// feature: an LLM asked to "quote the community" will happily fabricate a
-// plausible-looking comment and link, and a fabricated link in a marketing
-// dashboard is a much worse failure than an imperfect cluster label.
+// sentiment, engagement — no URL) and asked only to (a) name the sub-topics
+// present and (b) say which record ids best represent each one. The actual
+// quote text, link, source, sentiment and engagement are then read back out
+// of our own already-enriched data by that id, never out of the model's
+// response. This matters specifically for this feature: an LLM asked to
+// "quote the community" will happily fabricate a plausible-looking comment
+// and link, and a fabricated link in a marketing dashboard is a much worse
+// failure than an imperfect cluster label.
+//
+// RUNS ON ENRICHED DATA. Unlike the first version of this module, records
+// are passed in *after* lib/nlp.js has scored them — so ranking "which
+// records to feature" uses the platform-normalised Engagement Index (0-100)
+// instead of each platform's own incomparable native metric (Reddit
+// upvotes vs. YouTube likes vs. Discord reactions vs. Twitch view count),
+// and every quote and cluster can carry a real, already-computed sentiment
+// reading — attributed to Claude's semantic layer, not invented by Gemini.
 //
 // This talks to Google's Gemini Interactions API directly over fetch — no
 // SDK dependency, matching how every other platform wrapper in this codebase
@@ -74,15 +83,15 @@ const CLUSTER_SCHEMA = {
   additionalProperties: false,
 };
 
-const SYSTEM_PROMPT = `You analyse public gaming-community discussion about a video game for a marketing intelligence dashboard. The records you're given may come from more than one platform — YouTube comments, Reddit posts and comments, Discord messages, Twitch clip titles — mixed together; each record tells you which.
+const SYSTEM_PROMPT = `You analyse public gaming-community discussion about a video game for a marketing intelligence dashboard. The records you're given may come from more than one platform — YouTube comments, Reddit posts and comments, Discord messages, Twitch clip titles — mixed together; each record tells you which, along with a sentiment reading already computed by a separate semantic model and an Engagement Index (0-100, higher means more reach/reaction).
 
 Group the supplied records into 3-5 genuinely distinct sub-topics the community is discussing right now, regardless of which platform each record came from. Do not use a fixed category list — name the actual topics present in this data, in terms the community itself would recognise (e.g. "Developer Responsiveness", "Character Skins and Rarity", "Game Balance and Patches"). Order sub-topics by how much discussion volume they represent, most-discussed first.
 
-For each sub-topic, write a short plain-English summary of what's being said and the general tone, then choose 2-4 record ids — from the ids given to you — whose text best represents it. Prefer ids that are genuinely representative, and where useful, pick ids that span more than one platform or reflect a real range of views rather than several near-identical takes from the same source.
+For each sub-topic, write a short plain-English summary of what's being said and the general tone, then choose 2-4 record ids — from the ids given to you — whose text best represents it. Prefer ids that are genuinely representative and high-engagement; where the sentiment field shows real disagreement within a sub-topic, prefer a mix of ids that shows that range rather than several near-identical takes, and where practical prefer ids that span more than one platform.
 
 Note: Twitch records are clip titles written by the streamer or clipper as promotion, not player commentary — read them as framing, not as community sentiment, and don't let them dominate a cluster meant to represent what players themselves are saying.
 
-Only ever use ids that were given to you in the input. Never write out the quote text yourself — you are selecting existing records, not quoting from memory.`;
+Only ever use ids that were given to you in the input. Never write out the quote text yourself, and never state a sentiment or engagement figure yourself — you are selecting existing records, not quoting or scoring from memory.`;
 
 function isConfigured() {
   return Boolean(process.env.GEMINI_API_KEY);
@@ -124,12 +133,17 @@ async function callGemini(recordsPayload) {
   return JSON.parse(textBlock.text);
 }
 
+function round1(n) {
+  return Math.round(Number(n || 0) * 10) / 10;
+}
+
 /**
- * Clusters one game's live records — potentially spanning several
- * platforms — into discussion sub-topics. `rows` need text, score, url,
- * source and platform. Returns a stable shape whether or not clustering
- * actually ran, so the dashboard can render an honest "why not" instead of
- * an empty gap.
+ * Clusters one game's live, already-enriched records — potentially spanning
+ * several platforms — into discussion sub-topics. `rows` are lib/nlp.js +
+ * lib/engagement.js output: they need text, url, source, platform,
+ * engagement_index, sentiment_score, sentiment_label and is_risk. Returns a
+ * stable shape whether or not clustering actually ran, so the dashboard can
+ * render an honest "why not" instead of an empty gap.
  */
 async function summariseDiscussion(game, rows) {
   if (!isConfigured()) {
@@ -145,20 +159,20 @@ async function summariseDiscussion(game, rows) {
     };
   }
 
-  // Feature the highest-engagement records first — the same "sort by top"
-  // view a human moderator would actually skim. Note the engagement figure
-  // being sorted on isn't the same metric across platforms (Reddit upvotes,
-  // YouTube likes, Discord reactions, Twitch view count) — good enough to
-  // rank within a mixed pool for "which records to feature", not intended as
-  // a cross-platform comparison in itself (that's what Engagement Index,
-  // computed elsewhere, is actually for).
-  const ranked = [...pool].sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, MAX_RECORDS_PER_CALL);
+  // Feature the highest-Engagement-Index records first — the same "sort by
+  // top" view a human moderator would actually skim, but using the
+  // platform-normalised 0-100 index (computed by lib/engagement.js) rather
+  // than each platform's own incomparable native metric, so a mixed pool
+  // doesn't quietly over-represent whichever platform happens to inflate
+  // numbers most.
+  const ranked = [...pool].sort((a, b) => (b.engagement_index || 0) - (a.engagement_index || 0)).slice(0, MAX_RECORDS_PER_CALL);
   const byId = new Map(ranked.map((r, i) => [i, r]));
   const payload = ranked.map((r, i) => ({
     id: i,
     platform: r.platform,
     text: (r.text || "").slice(0, MAX_TEXT_CHARS),
-    score: r.score || 0,
+    sentiment: r.sentiment_label || "neutral",
+    engagement: Math.round(r.engagement_index || 0),
   }));
 
   try {
@@ -175,16 +189,35 @@ async function summariseDiscussion(game, rows) {
             url: r.url,
             source: r.source,
             platform: r.platform,
-            score: r.score || 0,
+            sentiment_score: r.sentiment_score,
+            sentiment_label: r.sentiment_label,
+            engagement_index: r.engagement_index,
+            is_risk: Boolean(r.is_risk),
           }));
-        return { title: c.title, summary: c.summary, quotes };
+        if (!quotes.length) return null; // resolved to nothing real — dropped below
+        // Sentiment and risk on a cluster are OUR arithmetic over the
+        // already-resolved, real quotes — never something Gemini stated —
+        // so the same "grounded, not generated" guarantee extends to these
+        // summary figures, not just the quote text.
+        const avg_sentiment = Math.round(quotes.reduce((s, q) => s + (q.sentiment_score || 0), 0) / quotes.length);
+        const has_risk = quotes.some((q) => q.is_risk);
+        return { title: c.title, summary: c.summary, avg_sentiment, has_risk, quotes };
       })
       // A cluster whose quote_ids didn't resolve to any real record is
       // dropped rather than shown with no evidence behind it.
-      .filter((c) => c.quotes.length > 0);
+      .filter(Boolean);
 
     const platforms = [...new Set(ranked.map((r) => r.platform))].sort();
-    return { game, available: true, clusters, generated_by: MODEL, record_count: ranked.length, platforms };
+    const avgEngagementSent = round1(payload.reduce((s, p) => s + p.engagement, 0) / payload.length);
+    return {
+      game,
+      available: true,
+      clusters,
+      generated_by: MODEL,
+      record_count: ranked.length,
+      platforms,
+      avg_engagement_of_pool: avgEngagementSent,
+    };
   } catch (err) {
     return { game, available: false, clusters: [], reason: `Gemini clustering failed: ${err.message}` };
   }
@@ -192,11 +225,11 @@ async function summariseDiscussion(game, rows) {
 
 /**
  * Runs summariseDiscussion for every game present in `liveRows`, in
- * parallel. `liveRows` should be the combined, pre-enrichment output of
- * whichever platform collectors ran this refresh — collectYouTube().rows,
- * collectReddit().rows, collectDiscord().rows, collectTwitch().rows — never
- * sample/illustrative rows. Whichever platforms are actually configured and
- * returning live data is exactly what shows up here; nothing is hardcoded.
+ * parallel. `liveRows` should be enriched (post lib/nlp.js + lib/engagement.js)
+ * records covering whichever platforms collected live data this refresh —
+ * never sample/illustrative rows. Whichever platforms are actually
+ * configured and returning live data is exactly what shows up here; nothing
+ * is hardcoded.
  */
 async function generateDiscussionSummaries(liveRows) {
   const byGame = new Map();

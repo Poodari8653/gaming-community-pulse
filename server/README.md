@@ -169,49 +169,62 @@ handful of sub-topics in the community's own terms ("Developer
 Responsiveness", "Character Skins and Rarity"), not the dashboard's fixed
 17-item theme vocabulary, and shows real quotes under each one.
 
-**Gemini never writes the quote text or the link.** It is shown a numbered
-list of real records (id, platform, text, score — no URL) and asked only to
-name the sub-topics present and say which record ids best represent each one.
-The actual quote text, link and source are then read back out of our own
-collected data by that id, never taken from the model's response. An id the
-model invents that doesn't exist in the input is silently dropped rather than
-shown. This matters specifically here: an LLM asked to "quote the community"
-will happily fabricate a plausible-looking comment and link, and a fabricated
-link in a marketing dashboard is a much worse failure than an imperfect
-cluster label.
+**Gemini never writes the quote text, link, or sentiment.** It is shown a
+numbered list of real records (id, platform, text, an already-computed
+sentiment label, an already-computed Engagement Index — no URL) and asked
+only to name the sub-topics present and say which record ids best represent
+each one. The actual quote text, link, source, sentiment and engagement are
+then read back out of our own **already-enriched** data by that id, never
+taken from the model's response. A cluster's `avg_sentiment` and `has_risk`
+are our own arithmetic over those resolved quotes, not something the model
+stated either. An id the model invents that doesn't exist in the input is
+silently dropped rather than shown. This matters specifically here: an LLM
+asked to "quote the community" will happily fabricate a plausible-looking
+comment and link, and a fabricated link — or a fabricated sentiment reading —
+in a marketing dashboard is a much worse failure than an imperfect cluster
+label.
 
 Other rules worth knowing:
 
 - **No platform is hardcoded.** `lib/gemini.js` doesn't know or care which
   platform a record came from beyond tagging it for attribution. `server.js`
-  decides what's "live" by passing it the combined raw output of whichever
-  collectors ran this refresh — `collectYouTube().rows`,
-  `collectReddit().rows`, `collectDiscord().rows`, `collectTwitch().rows` — so
-  whichever platforms are actually configured is exactly what gets clustered.
-  A game with only Reddit configured gets Reddit-only clusters; a game with
-  all four gets a genuinely cross-platform view, with each quote tagged by
-  its platform in the UI. Each cluster's parent record also reports a
-  `platforms` array listing every platform that contributed to it.
-- **Never the sample.** The rows passed in are always pre-sample-merge raw
-  collector output, never the illustrative sample rows `loadSampleRows()`
-  adds elsewhere. If none of the four platforms are configured, or a game has
-  too little combined live volume (fewer than 6 records) to cluster
-  meaningfully, that game's panel reports itself unavailable with the
-  specific reason, rather than clustering sample text and presenting it as
-  real discussion.
+  decides what's "live" by passing it `enriched` — every record across
+  whichever platforms actually collected data this refresh, already scored by
+  `lib/nlp.js` and `lib/engagement.js` — so whichever platforms are actually
+  configured is exactly what gets clustered. A game with only Reddit
+  configured gets Reddit-only clusters; a game with all four gets a genuinely
+  cross-platform view, with each quote tagged by its platform in the UI. Each
+  cluster's parent record also reports a `platforms` array listing every
+  platform that contributed to it.
+- **Ranked by Engagement Index, not each platform's own metric.** Records are
+  ranked by the same 0-100 `engagement_index` used everywhere else on the
+  dashboard to decide which ~60 to send the model per game — not Reddit
+  upvotes, YouTube likes, Discord reaction count or Twitch view count
+  separately, which aren't comparable to each other. This also means a mixed
+  pool doesn't quietly over-represent whichever platform happens to inflate
+  its own raw numbers most.
+- **Never the sample.** `enriched` never includes the illustrative sample
+  rows `loadSampleRows()` adds elsewhere. If none of the four platforms are
+  configured, or a game has too little combined live volume (fewer than 6
+  records) to cluster meaningfully, that game's panel reports itself
+  unavailable with the specific reason, rather than clustering sample text
+  and presenting it as real discussion.
 - **Twitch text is clip titles, not player commentary.** The system prompt
   tells the model this explicitly, since a clip title is streamer/clipper
   promotional framing, not community sentiment, and shouldn't be allowed to
   dominate a cluster meant to represent what players themselves are saying.
-- **The ranking metric isn't cross-platform-comparable.** Records are
-  ranked by their own `score` field to decide which ~60 to send the model per
-  game — Reddit upvotes, YouTube likes, Discord reaction count, Twitch view
-  count. That's a reasonable "which are worth featuring" signal within a
-  mixed pool, but it is not the same thing as the platform-normalised
-  Engagement Index used everywhere else on the dashboard.
+- **Sentiment and risk are Claude's, surfaced through a Gemini-organised
+  view.** Each quote carries the `sentiment_score`/`sentiment_label`/`is_risk`
+  that `lib/nlp.js` already computed for that record — the same figures that
+  drive every other sentiment number on the dashboard. A cluster shown with a
+  <b>risk</b> badge means at least one of its real, resolved quotes was
+  already flagged `is_risk` by that layer, not that Gemini judged it risky.
 - **Independent of `ANTHROPIC_API_KEY`.** Gemini and Claude are unrelated
   credentials for unrelated features; either can be configured without the
-  other.
+  other. The sentiment a Gemini-clustered quote carries, though, does depend
+  on `ANTHROPIC_API_KEY` being set — without it, that figure comes from the
+  gaming-tuned lexicon fallback instead of semantic scoring, same as
+  everywhere else on the dashboard.
 
 ---
 
@@ -326,10 +339,15 @@ The full payload the dashboard renders: `overall`, `games_summary`,
 client-side).
 
 `discussion_summaries` is one entry per game with any live data on any
-platform: `{ game, available, clusters, generated_by, platforms }` when
-Gemini ran (`platforms` lists which of YouTube/Reddit/Discord/Twitch actually
-contributed records), or `{ game, available: false, reason }` when it didn't
-(unconfigured, too little combined volume, or an API error) — see §3a.
+platform: `{ game, available, clusters, generated_by, platforms,
+avg_engagement_of_pool }` when Gemini ran (`platforms` lists which of
+YouTube/Reddit/Discord/Twitch actually contributed records), or
+`{ game, available: false, reason }` when it didn't (unconfigured, too little
+combined volume, or an API error) — see §3a. Each cluster is
+`{ title, summary, avg_sentiment, has_risk, quotes }`, and each quote is
+`{ text, url, source, platform, sentiment_score, sentiment_label,
+engagement_index, is_risk }` — all read back from the same enriched records
+everywhere else on the dashboard uses, not model output.
 
 Results are cached in memory for **5 minutes**. Append `?force=1` to bypass the
 cache and run a full collection — this is what the dashboard's "Refresh data"

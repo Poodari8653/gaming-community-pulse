@@ -577,18 +577,16 @@ async function refresh() {
   analysis.briefing = await generateBriefing(analysis);
 
   // 5b. DISCUSS — a second, independent AI pass (Gemini, not Claude) that
-  // clusters each game's live discussion into sub-topics with grounded
-  // quotes. Runs over the raw collector output for every platform — yt.rows,
-  // rd.rows, dc.rows, tw.rows — never the illustrative sample, so every
-  // quote this panel shows links to an actual public post, comment or clip.
-  // Whichever platforms are actually configured and live this refresh is
-  // exactly what gets clustered; nothing here is hardcoded to one platform.
-  analysis.discussion_summaries = await gemini.generateDiscussionSummaries([
-    ...yt.rows,
-    ...rd.rows,
-    ...dc.rows,
-    ...tw.rows,
-  ]);
+  // clusters each game's live discussion into sub-topics with grounded,
+  // already-scored quotes. Runs over `enriched` specifically — every live
+  // record across every platform, already carrying sentiment and Engagement
+  // Index from step 2, but never the illustrative sample rows added below —
+  // so every quote this panel shows links to an actual public post, comment
+  // or clip, and ranks/attributes by the same normalised metrics as the rest
+  // of the dashboard rather than each platform's own incomparable native
+  // one. Whichever platforms are actually configured and live this refresh
+  // is exactly what gets clustered; nothing here is hardcoded to one platform.
+  analysis.discussion_summaries = await gemini.generateDiscussionSummaries(enriched);
 
   // 6. SERVE — records ride along so all three global filters work client-side.
   analysis.records = rows;

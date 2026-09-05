@@ -292,7 +292,7 @@
 
   <section class="panel" id="discussionsPanel" aria-labelledby="disc-h">
     <h2 id="disc-h">Top discussions</h2>
-    <p class="desc">A second, independent AI pass — Gemini, not Claude — clusters each game's live discussion, across whichever platforms are actually configured, into the sub-topics people are actually talking about right now. Gemini only picks which real records represent each cluster; it never writes the quote text or link itself, so every quote below traces back to an actual public post, comment or clip. Illustrative sample data is never included.</p>
+    <p class="desc">A second, independent AI pass — Gemini, not Claude — clusters each game's live discussion, across whichever platforms are actually configured, into the sub-topics people are actually talking about right now, ranked by Engagement Index rather than each platform's own metric. Gemini only picks which real records represent each cluster; it never writes the quote text, link, or sentiment score itself — sentiment tags and the "avg" figure per cluster are read straight from Claude's own scoring, and a cluster is flagged <span class="sev high" style="margin:0">risk</span> only if one of its real quotes was already flagged by that layer. Illustrative sample data is never included.</p>
     <div id="discussionsBody"></div>
   </section>
 
@@ -823,9 +823,18 @@ function renderDiscussions(){
           : "Clustered, but no sub-topic had a quote that survived grounding.") + '</p>';
       } else {
         modelNote = s.generated_by;
-        body = clusters.map(c =>
-          '<div class="brief-item" style="margin-bottom:10px">' +
-            '<div class="t">' + esc(c.title) + '</div>' +
+        body = clusters.map(c => {
+          // avg_sentiment/has_risk on the ORIGINAL (pre-channel-filter)
+          // cluster is what the server computed; recompute over the
+          // currently-shown quotes so the figure always matches what's on
+          // screen when the channel filter has trimmed the quote list.
+          const avgSent = Math.round(c.quotes.reduce((a, q) => a + (q.sentiment_score || 0), 0) / c.quotes.length);
+          const hasRisk = c.quotes.some(q => q.is_risk);
+          return '<div class="brief-item" style="margin-bottom:10px">' +
+            '<div class="t">' + esc(c.title) +
+              ' <span class="tag ' + esc(sentClass(avgSent) === "pos" ? "positive" : sentClass(avgSent) === "neg" ? "negative" : "neutral") + '">' + signed(avgSent) + ' avg</span>' +
+              (hasRisk ? ' <span class="sev high">risk</span>' : "") +
+            '</div>' +
             '<div class="d">' + esc(c.summary) + '</div>' +
             '<div style="margin-top:8px">' +
               c.quotes.map(q =>
@@ -833,17 +842,20 @@ function renderDiscussions(){
                 '<div class="card-meta">' +
                   (q.platform ? '<span class="pill">' + esc(q.platform) + '</span>' : "") +
                   (q.source ? '<span class="pill">' + esc(q.source) + '</span>' : "") +
-                  '<span class="pill">score ' + num(q.score) + '</span>' +
+                  (q.sentiment_label ? '<span class="tag ' + esc(q.sentiment_label) + '">' + signed(q.sentiment_score) + '</span>' : "") +
+                  '<span class="pill">engagement ' + num(Math.round(q.engagement_index || 0)) + '</span>' +
+                  (q.is_risk ? '<span class="sev high">risk</span>' : "") +
                   (q.url ? '<a href="' + esc(q.url) + '" target="_blank" rel="noopener">source</a>' : "") +
                 '</div></div>'
               ).join("") +
             '</div>' +
-          '</div>'
-        ).join("");
+          '</div>';
+        }).join("");
       }
     }
     const platformNote = (s.available && s.platforms && s.platforms.length)
-      ? s.platforms.map(p => '<span class="pill">' + esc(p) + '</span>').join("")
+      ? s.platforms.map(p => '<span class="pill">' + esc(p) + '</span>').join("") +
+        (s.avg_engagement_of_pool != null ? '<span class="pill">avg engagement ' + esc(s.avg_engagement_of_pool) + '</span>' : "")
       : "";
     return '<div style="margin-bottom:22px"><h3>' + esc(s.game) + ' ' + platformNote + '</h3>' + body + '</div>';
   }).join("");
