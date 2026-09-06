@@ -22,6 +22,13 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
+const { createClient } = require("@supabase/supabase-js");
+
+const supabase =
+  process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
+    ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY)
+    : null;
+
 const RETENTION_DAYS = 90;
 
 let resolvedDir = null;
