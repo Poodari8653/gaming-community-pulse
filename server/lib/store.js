@@ -1,138 +1,224 @@
+```js
 // ---------------------------------------------------------------------------
-// Daily snapshot store.
+// Daily snapshot store — Supabase
 //
-// The dashboard has to answer "what changed since yesterday?" (Questionary §6
-// and §8), which needs history. The previous build had none — its only state
-// was a 5-minute in-memory cache that died with the process, so no delta was
-// computable at all.
+// Stores one compact JSON snapshot per day in the Supabase
+// `daily_snapshots` table.
 //
-// This writes one compact JSON snapshot per day: aggregates only, no raw
-// records, so the directory stays small (a few KB/day) and no user-authored
-// text is persisted beyond the short examples already shown on screen.
+// The rest of the application continues to use the same interface:
+//   saveSnapshot(snapshot)
+//   readSnapshot(date)
+//   listSnapshots()
+//   previousSnapshot(beforeDate)
+//   storageInfo()
 //
-// Storage location resolves in this order:
-//   1. SNAPSHOT_DIR env var — set this to a mounted volume in production.
-//   2. <repo>/data/snapshots — the default for local runs and Render.
-//   3. os.tmpdir() — fallback for read-only filesystems (e.g. Vercel's
-//      serverless bundle). Ephemeral, so deltas won't survive a cold start;
-//      the dashboard reports that honestly rather than showing stale numbers.
+// Supabase credentials are supplied through environment variables:
+//   SUPABASE_URL
+//   SUPABASE_SECRET_KEY
 // ---------------------------------------------------------------------------
-
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
 
 const RETENTION_DAYS = 90;
 
-let resolvedDir = null;
-let resolvedMode = null;
+let client = null;
+let initialised = false;
+let initError = null;
 
-function resolveDir() {
-  if (resolvedDir) return resolvedDir;
+function getClient() {
+  if (initialised) return client;
 
-  const candidates = [
-    process.env.SNAPSHOT_DIR && { dir: process.env.SNAPSHOT_DIR, mode: "configured" },
-    { dir: path.join(__dirname, "..", "..", "data", "snapshots"), mode: "repo" },
-    { dir: path.join(os.tmpdir(), "gaming-community-pulse-snapshots"), mode: "ephemeral" },
-  ].filter(Boolean);
+  initialised = true;
 
-  for (const c of candidates) {
-    try {
-      fs.mkdirSync(c.dir, { recursive: true });
-      fs.accessSync(c.dir, fs.constants.W_OK);
-      resolvedDir = c.dir;
-      resolvedMode = c.mode;
-      return resolvedDir;
-    } catch (_) {
-      // try the next candidate
-    }
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+
+  if (!url || !key) {
+    initError = "SUPABASE_URL or SUPABASE_SECRET_KEY is not configured";
+    return null;
   }
 
-  resolvedDir = null;
-  resolvedMode = "unavailable";
-  return null;
-}
-
-function snapshotPath(date) {
-  const dir = resolveDir();
-  return dir ? path.join(dir, `${date}.json`) : null;
-}
-
-/** Writes (or overwrites) today's snapshot. Never throws — storage is best-effort. */
-function saveSnapshot(snapshot) {
-  const p = snapshotPath(snapshot.date);
-  if (!p) return { saved: false, mode: resolvedMode };
   try {
-    fs.writeFileSync(p, JSON.stringify(snapshot), "utf-8");
-    pruneOld();
-    return { saved: true, mode: resolvedMode, path: p };
+    // Use the Supabase REST API directly so no additional npm package
+    // is required.
+    client = {
+      url: url.replace(/\/$/, ""),
+      key,
+    };
   } catch (err) {
-    return { saved: false, mode: resolvedMode, error: err.message };
+    initError = err.message;
+    client = null;
+  }
+
+  return client;
+}
+
+async function supabaseRequest(endpoint, options = {}) {
+  const supabase = getClient();
+
+  if (!supabase) {
+    throw new Error(initError || "Supabase is not configured");
+  }
+
+  const response = await fetch(`${supabase.url}/rest/v1/${endpoint}`, {
+    ...options,
+    headers: {
+      apikey: supabase.key,
+      Authorization: `Bearer ${supabase.key}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Supabase ${response.status}: ${body}`);
+  }
+
+  if (response.status === 204) return null;
+
+  return response.json();
+}
+
+/**
+ * Writes (or overwrites) today's snapshot.
+ *
+ * `date` is the primary key, so upsert replaces an existing snapshot
+ * for the same day.
+ */
+async function saveSnapshot(snapshot) {
+  try {
+    await supabaseRequest("daily_snapshots?on_conflict=date", {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        date: snapshot.date,
+        generated_at: snapshot.generated_at,
+        overall: snapshot.overall,
+        games_summary: snapshot.games_summary,
+        platform_summary: snapshot.platform_summary,
+        region_summary: snapshot.region_summary,
+        themes: snapshot.themes,
+        risk_count: snapshot.risk_count,
+        provenance: snapshot.provenance,
+      }),
+    });
+
+    return {
+      saved: true,
+      mode: "supabase",
+    };
+  } catch (err) {
+    return {
+      saved: false,
+      mode: "supabase",
+      error: err.message,
+    };
   }
 }
 
-/** Lists stored snapshot dates, newest first. */
-function listSnapshots() {
-  const dir = resolveDir();
-  if (!dir) return [];
+/**
+ * Lists stored snapshot dates, newest first.
+ */
+async function listSnapshots() {
   try {
-    return fs
-      .readdirSync(dir)
-      .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-      .map((f) => f.replace(/\.json$/, ""))
-      .sort()
-      .reverse();
+    const rows = await supabaseRequest(
+      "daily_snapshots?select=date&order=date.desc"
+    );
+
+    return rows
+      .map((row) => row.date)
+      .filter(Boolean);
   } catch (_) {
     return [];
   }
 }
 
-function readSnapshot(date) {
-  const p = snapshotPath(date);
-  if (!p) return null;
+/**
+ * Reads one daily snapshot.
+ */
+async function readSnapshot(date) {
   try {
-    return JSON.parse(fs.readFileSync(p, "utf-8"));
+    const rows = await supabaseRequest(
+      `daily_snapshots?select=*&date=eq.${encodeURIComponent(date)}&limit=1`
+    );
+
+    return rows.length ? rows[0] : null;
   } catch (_) {
     return null;
   }
 }
 
 /**
- * The most recent snapshot strictly older than `beforeDate` — the baseline the
- * "what changed" panel compares against. Using the most recent *earlier* day
- * rather than literally yesterday means a weekend gap in collection still
- * produces a meaningful comparison.
+ * Returns the most recent snapshot strictly older than beforeDate.
+ *
+ * This preserves the behaviour of the original filesystem store:
+ * the comparison baseline is the most recent earlier snapshot, rather
+ * than necessarily yesterday.
  */
-function previousSnapshot(beforeDate) {
-  const earlier = listSnapshots().filter((d) => d < beforeDate);
-  if (!earlier.length) return null;
-  return readSnapshot(earlier[0]);
+async function previousSnapshot(beforeDate) {
+  try {
+    const rows = await supabaseRequest(
+      `daily_snapshots?select=*&date=lt.${encodeURIComponent(
+        beforeDate
+      )}&order=date.desc&limit=1`
+    );
+
+    return rows.length ? rows[0] : null;
+  } catch (_) {
+    return null;
+  }
 }
 
-function pruneOld() {
-  const dir = resolveDir();
-  if (!dir) return;
-  const cutoff = new Date(Date.now() - RETENTION_DAYS * 86400_000).toISOString().slice(0, 10);
-  for (const d of listSnapshots()) {
-    if (d < cutoff) {
-      try {
-        fs.unlinkSync(path.join(dir, `${d}.json`));
-      } catch (_) {
-        /* ignore */
+/**
+ * Deletes snapshots older than RETENTION_DAYS.
+ *
+ * This keeps the same 90-day retention policy as the original store.
+ */
+async function pruneOld() {
+  const cutoff = new Date(
+    Date.now() - RETENTION_DAYS * 86400_000
+  )
+    .toISOString()
+    .slice(0, 10);
+
+  try {
+    await supabaseRequest(
+      `daily_snapshots?date=lt.${encodeURIComponent(cutoff)}`,
+      {
+        method: "DELETE",
+        headers: {
+          Prefer: "return=minimal",
+        },
       }
-    }
+    );
+  } catch (_) {
+    // Retention cleanup is best-effort.
   }
 }
 
 function storageInfo() {
-  resolveDir();
+  const configured = Boolean(
+    process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
+  );
+
   return {
-    mode: resolvedMode,
-    directory: resolvedDir,
-    snapshots_held: listSnapshots().length,
+    mode: configured ? "supabase" : "unavailable",
+    directory: null,
+    snapshots_held: null,
     retention_days: RETENTION_DAYS,
-    durable: resolvedMode === "configured" || resolvedMode === "repo",
+    durable: configured,
+    configured,
+    error: configured ? null : initError,
   };
 }
 
-module.exports = { saveSnapshot, readSnapshot, listSnapshots, previousSnapshot, storageInfo };
+module.exports = {
+  saveSnapshot,
+  readSnapshot,
+  listSnapshots,
+  previousSnapshot,
+  storageInfo,
+  pruneOld,
+};
+```
