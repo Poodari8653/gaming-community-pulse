@@ -56,6 +56,44 @@ AUTH_USERS=alice:correct-horse-battery,bob:another-passphrase
 SESSION_SECRET=any-long-random-string
 ```
 
+**Two roles, no database.** Append `:admin` to a pair to make that person an
+admin; leave it off (as above) and they default to a regular `user`:
+
+```bash
+AUTH_USERS=alice:correct-horse-battery:admin,bob:another-passphrase
+```
+
+Everyone — admin or user — gets full read access to the dashboard itself.
+Admins additionally get two things a regular viewer doesn't:
+
+- **Force-refresh** (`GET /api/analysis?force=1`, the "Refresh data" button):
+  the one action on this dashboard that costs money every time it runs — it
+  re-scores everything through Claude, re-clusters through Gemini, and
+  re-hits the YouTube/Reddit/Discord/Twitch quotas. A non-admin's page just
+  serves the shared 5-minute cache like any unforced request; the button
+  itself is hidden for them, and the endpoint 403s if it's hit directly.
+- **`GET /api/health`**, the operational/config status endpoint: which
+  sources are configured, which models are in use, storage durability, and a
+  read-only roster of who's in `AUTH_USERS` and what role they have (never
+  passwords). This is the closest thing this tool has to "user management" —
+  there's no admin UI to add or remove people; RS edits `AUTH_USERS` and
+  restarts, and this endpoint just lets an admin see the result without shell
+  access. It's surfaced in the dashboard itself as a collapsible "Admin —
+  access & configuration" panel, visible only to admins.
+
+There's nothing here that needs a database because nobody self-manages their
+own role — RS decides who's who by editing one environment variable, and a
+restart is what applies it. A password must not itself contain a `:` — that
+would be ambiguous with the role suffix, so an entry like that is treated as
+malformed and skipped (that person just can't sign in, which is a loud
+enough failure to notice and fix, rather than a colon silently becoming part
+of a password).
+
+The role travelling inside the session cookie is never trusted on its own —
+every request re-looks-up the signed-in username's *current* role from
+`AUTH_USERS`, so demoting or removing someone in the env var takes effect on
+their very next request, not just their next login.
+
 Restart the server after changing either. Visiting any page while signed out
 redirects to `/login`; API calls made while signed out get a `401` JSON body
 instead of a redirect, so the dashboard's own `fetch()` calls fail cleanly
@@ -92,8 +130,10 @@ without shell access to its logs.
 **If `AUTH_USERS` is left unset, the app still boots — matching every other
 optional integration in this codebase — but the instance is wide open, with no
 login required**, and `/login` itself just redirects straight through to the
-dashboard. A loud warning prints in the server logs at startup when this is
-the case:
+dashboard. With nobody to distinguish, every request is treated as **admin**
+in this state — so force-refresh and `/api/health` both work with no
+restriction, same as everything else. A loud warning prints in the server
+logs at startup when this is the case:
 
 ```
 WARNING: AUTH_USERS is not set — this instance is WIDE OPEN, with no
@@ -102,9 +142,21 @@ deploying anywhere reachable off your machine, set AUTH_USERS in
 .env or this dashboard is public.
 ```
 
-Treat that warning as blocking for any deployment beyond your own laptop.
-`/api/health` also reports `access_control.configured` and
-`access_control.user_count`, so you can check a deployed instance's state
+A second warning prints if `AUTH_USERS` *is* set but nobody in it has
+`:admin` — that's a valid but probably unintended configuration, since no one
+would be able to force a refresh or view `/api/health`:
+
+```
+WARNING: no user in AUTH_USERS has :admin. Nobody can force a
+refresh or view /api/health until you add ':admin' after one
+person's password, e.g. alice:pass:admin. Everyone still has full
+read access to the dashboard itself.
+```
+
+Treat the first warning as blocking for any deployment beyond your own
+laptop. `/api/health` also reports `access_control.configured`,
+`access_control.user_count`, `access_control.admin_count`, and
+`access_control.viewer_count`, so you can check a deployed instance's state
 without needing shell access to its logs.
 
 **Why a signed cookie and not SSO.** The requirement here is simple — keep
@@ -392,14 +444,29 @@ Deployment check. Returns:
     "retention_days": 90,
     "durable": true
   },
-  "access_control": { "configured": true, "user_count": 2 }
+  "access_control": {
+    "configured": true,
+    "user_count": 2,
+    "admin_count": 1,
+    "viewer_count": 1,
+    "login_url": "/login",
+    "session_secret_set": true,
+    "users": [
+      { "user": "alice", "role": "admin" },
+      { "user": "bob", "role": "user" }
+    ]
+  }
 }
 ```
 
-`/api/health` is itself behind `AUTH_USERS` like every other route — you need
-valid credentials to check whether credentials are required, which is correct:
-an unauthenticated deployment status check would leak configuration state to
-anyone who found the URL.
+`/api/health` is **admin-only**, one level stricter than every other route
+(which just needs `AUTH_USERS` login): a regular user gets a `403` here, the
+same as hitting force-refresh does. You need admin credentials to check
+whether credentials are required, which is correct: an unauthenticated (or
+merely logged-in) status check would leak configuration state — including the
+full username/role roster — to anyone who found the URL. The dashboard itself
+only calls this endpoint, and only shows the resulting panel, when the signed-
+in viewer's role is `admin`.
 
 `configured` means the credentials are present, not that the last call
 succeeded. For collection failures, read `fetch_errors` in `/api/analysis`.
@@ -552,8 +619,11 @@ copy is expected to be in the repository already.
 |---|---|
 | Startup logs "WARNING: AUTH_USERS is not set — WIDE OPEN" | Expected until you set `AUTH_USERS` (§2). Fine for local testing; do not deploy in this state. |
 | Startup logs "WARNING: SESSION_SECRET is not set" | Sessions won't survive a restart/redeploy/new instance — everyone gets signed out. Set `SESSION_SECRET` to any long random string (§2). |
-| `/login` keeps redirecting back to itself with "Incorrect username or password" | Wrong username or password against the pairs in `AUTH_USERS`, or a typo/missing `:` when the variable was set. Check `/api/health`'s `access_control.user_count` matches what you expect (needs a valid session to view, deliberately). |
+| `/login` keeps redirecting back to itself with "Incorrect username or password" | Wrong username or password against the pairs in `AUTH_USERS`, or a typo/missing `:` when the variable was set. Check `/api/health`'s `access_control.user_count` matches what you expect (needs an *admin* session to view, deliberately). |
 | Logged in, then signed out again a few minutes later for no reason | `SESSION_SECRET` is unset (or changed) and the process restarted — see the SESSION_SECRET warning above. |
+| "Refresh data" button is missing, or force-refresh 403s | You're signed in as a `user`, not an `admin` — expected. Add `:admin` after that person's password in `AUTH_USERS` and restart if they should have it. |
+| `/api/health` returns 403 | Same as above — that endpoint is admin-only. |
+| Startup logs "WARNING: no user in AUTH_USERS has :admin" | Valid but likely unintended: nobody can force-refresh or view `/api/health`. Add `:admin` after one person's password. |
 | Startup logs "Not configured: …" | Expected with an empty `.env`. Those sources are skipped; everything else still runs. |
 | Sentiment banner says "gaming-tuned lexicon fallback" | `ANTHROPIC_API_KEY` is unset or the `@anthropic-ai/sdk` package is missing. The banner reflects only whether the key and SDK are present — if the key is set but batches are failing, the banner still names the model, so check `sentiment_engine.errors` and `sentiment_engine.fallback` in `/api/analysis`, and the per-record `sentiment_method`, to see what was actually scored semantically. |
 | Themes panel looks thin, or only shows sample data | Themes on live records come from the semantic layer. Without `ANTHROPIC_API_KEY`, live rows carry no theme. |

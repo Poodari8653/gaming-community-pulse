@@ -95,7 +95,7 @@ instance verifies the same cookies.
 
 | Key | Unlocks | If you leave it blank |
 |---|---|---|
-| `AUTH_USERS` | **Required.** Comma-separated `username:password` pairs (e.g. `alice:correct-horse-battery,bob:another-passphrase`) — gates a real `/login` page in front of every route, including the static dashboard | The deployment is publicly reachable with no login. Vercel's function logs print a loud warning at every cold start when this is the case. |
+| `AUTH_USERS` | **Required.** Comma-separated `username:password` pairs, optionally `username:password:admin` (e.g. `alice:correct-horse-battery:admin,bob:another-passphrase`) — gates a real `/login` page in front of every route, including the static dashboard. Admins can force a refresh and view `/api/health`; everyone else has full read access to the dashboard only. | The deployment is publicly reachable with no login, and everyone is treated as admin. Vercel's function logs print a loud warning at every cold start when this is the case. |
 | `SESSION_SECRET` | **Required for stable logins.** Signs the session cookie `/login` issues. Any long random string. | A random secret is generated per instance, so sessions break across cold starts — see above. |
 | `ANTHROPIC_API_KEY` | Semantic sentiment (sarcasm, negation, gaming slang, non-English text), themes on live records, question and risk flags, and the AI daily briefing | Gaming-tuned lexicon fallback; live records carry no theme; no record-level risk flags, though theme-level risk detection still runs; the brief is computed from the figures and labelled as such on screen |
 | `YOUTUBE_API_KEY` | YouTube comments and video stats for the five tracked channels | YouTube absent from the dashboard — there is no YouTube sample data |

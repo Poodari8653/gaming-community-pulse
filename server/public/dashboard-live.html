@@ -154,6 +154,7 @@
     <p>Daily briefing on public gaming discussion across YouTube, Reddit, Discord and Twitch.</p>
   </div>
   <div class="header-actions">
+    <span id="viewerPill" class="pill" style="display:none"></span>
     <span id="lastUpdated" class="pill"></span>
     <button class="btn btn-primary" id="refreshBtn" type="button">Refresh data</button>
     <a class="btn" id="logoutLink" href="/logout">Log out</a>
@@ -332,6 +333,11 @@
   <details class="method">
     <summary>How every number on this page is calculated</summary>
     <div class="method-body" id="methodBody">Loading methodology…</div>
+  </details>
+
+  <details class="method" id="adminPanel" style="display:none">
+    <summary>Admin — access &amp; configuration status</summary>
+    <div class="method-body" id="adminBody">Loading…</div>
   </details>
 </main>
 
@@ -1030,6 +1036,60 @@ async function loadMethodology(){
   }
 }
 
+// Applies what the server told us about the signed-in viewer: shows a
+// "Signed in as X (role)" pill, hides the force-refresh button entirely for
+// non-admins (rather than just disabling it — a disabled button invites
+// "why can't I click this?"), and lazily loads the admin panel (roster +
+// config status from /api/health) only for admins. Runs once per load(),
+// since role can't change without a fresh login.
+let adminPanelLoaded = false;
+function applyViewer(viewer){
+  const pill = document.getElementById("viewerPill");
+  const refreshBtn = document.getElementById("refreshBtn");
+  const adminPanel = document.getElementById("adminPanel");
+  if (!viewer){
+    pill.style.display = "none";
+    return;
+  }
+  const role = viewer.role || "user";
+  pill.style.display = "inline-block";
+  pill.textContent = "Signed in as " + viewer.user + " (" + role + ")";
+
+  if (role === "admin"){
+    refreshBtn.style.display = "";
+    adminPanel.style.display = "";
+    if (!adminPanelLoaded){
+      adminPanelLoaded = true;
+      loadAdminPanel();
+    }
+  } else {
+    refreshBtn.style.display = "none";
+    adminPanel.style.display = "none";
+  }
+}
+
+async function loadAdminPanel(){
+  const body = document.getElementById("adminBody");
+  try{
+    const res = await fetch("/api/health");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to load admin status");
+    const ac = data.access_control || {};
+    const rows = (ac.users || []).map(u =>
+      "<tr><td>" + esc(u.user) + "</td><td>" + esc(u.role) + "</td></tr>"
+    ).join("");
+    body.innerHTML =
+      "<p><b>Access control:</b> " + (ac.configured ? "on" : "open (no AUTH_USERS set)") +
+      " — " + (ac.user_count || 0) + " user(s), " + (ac.admin_count || 0) + " admin, " +
+      (ac.viewer_count || 0) + " viewer.</p>" +
+      "<p><b>Session secret:</b> " + (ac.session_secret_set ? "set (persists across restarts)" : "not set — ephemeral, sessions reset on every restart") + "</p>" +
+      (rows ? "<table><thead><tr><th>User</th><th>Role</th></tr></thead><tbody>" + rows + "</tbody></table>" : "") +
+      "<p><b>Storage:</b> " + esc(JSON.stringify(data.storage || {})) + "</p>";
+  } catch(err){
+    body.textContent = "Couldn't load admin status: " + err.message;
+  }
+}
+
 async function load(force){
   document.getElementById("loading").style.display = "flex";
   document.getElementById("refreshBtn").disabled = true;
@@ -1042,6 +1102,7 @@ async function load(force){
     RECORDS = data.records || [];
     document.getElementById("lastUpdated").textContent =
       "Updated " + new Date(data.generated_at).toLocaleString();
+    applyViewer(data.viewer);
     renderBanners();
     render();
   } catch(err){

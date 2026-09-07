@@ -601,12 +601,28 @@ async function refresh() {
 app.get("/api/analysis", async (req, res) => {
   try {
     const force = req.query.force === "1";
+
+    // Forcing a refresh is the one action on this dashboard that actually
+    // costs money each time — it re-scores everything through Claude,
+    // re-clusters through Gemini, and re-hits YouTube/Reddit/Discord/Twitch
+    // quotas. Restricted to admins; a regular viewer's page just serves the
+    // 5-minute cache, same as any unforced request. This 403s rather than
+    // silently ignoring ?force=1, so the "Refresh data" button's failure (if
+    // someone bypasses the UI, which already hides that button for
+    // non-admins) is honest instead of quietly doing nothing.
+    if (force && req.authRole !== "admin") {
+      return res.status(403).json({
+        error: "Only admins can force a refresh — it re-runs paid API calls (Claude, Gemini) and re-hits platform quotas.",
+        your_role: req.authRole || "user",
+      });
+    }
+
     const fresh = cache.data && Date.now() - cache.fetchedAt < CACHE_TTL_MS;
-    if (fresh && !force) return res.json(cache.data);
+    if (fresh && !force) return res.json({ ...cache.data, viewer: { user: req.authUser, role: req.authRole } });
 
     const payload = await refresh();
     cache = { data: payload, fetchedAt: Date.now() };
-    res.json(payload);
+    res.json({ ...payload, viewer: { user: req.authUser, role: req.authRole } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -675,7 +691,11 @@ app.get("/api/methodology", (req, res) => {
   });
 });
 
-app.get("/api/health", (req, res) => {
+// Operational/config status — who's configured, which models, storage
+// durability. Admin-only: this is infrastructure detail for whoever runs
+// the tool, not something every viewer of the dashboard needs, and it's
+// more than a regular user needs to see about how the instance is wired up.
+app.get("/api/health", auth.requireAdmin, (req, res) => {
   res.json({
     ok: true,
     games: GAMES,
@@ -692,8 +712,15 @@ app.get("/api/health", (req, res) => {
     access_control: {
       configured: auth.configured,
       user_count: auth.userCount,
+      admin_count: auth.adminCount,
+      viewer_count: auth.viewerCount,
       login_url: "/login",
       session_secret_set: !auth.sessionSecretEphemeral,
+      // Read-only roster — usernames and roles only, never passwords. This is
+      // the "user-management view" this tool has instead of a database: RS
+      // edits AUTH_USERS and restarts to add, remove, or re-role someone;
+      // this just lets an admin see the result without shell access.
+      users: auth.configured ? auth.listUsers() : [],
     },
   });
 });
@@ -715,7 +742,18 @@ if (require.main === module) {
         "*************************************************************************\n"
       );
     } else {
-      console.log(`Access control: ON — ${auth.userCount} user(s) configured via AUTH_USERS. Login page at /login.`);
+      console.log(`Access control: ON — ${auth.userCount} user(s) configured via AUTH_USERS (${auth.adminCount} admin, ${auth.viewerCount} viewer). Login page at /login.`);
+      if (auth.adminCount === 0) {
+        console.warn(
+          "\n" +
+          "*************************************************************************\n" +
+          "*  WARNING: no user in AUTH_USERS has :admin. Nobody can force a         *\n" +
+          "*  refresh or view /api/health until you add ':admin' after one          *\n" +
+          "*  person's password, e.g. alice:pass:admin. Everyone still has full     *\n" +
+          "*  read access to the dashboard itself.                                 *\n" +
+          "*************************************************************************\n"
+        );
+      }
       if (auth.sessionSecretEphemeral) {
         console.warn(
           "\n" +

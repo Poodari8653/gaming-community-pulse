@@ -302,13 +302,37 @@ handler; `/login` and `/logout` are registered as ordinary routes that the
 middleware explicitly lets through.
 
 - **Configuration**: `AUTH_USERS`, a comma-separated list of
-  `username:password` pairs (`alice:pass1,bob:pass2`), parsed once at startup
-  into a `Map`; malformed entries (no `:`) are skipped rather than crashing
-  the process. `SESSION_SECRET` is a separate signing key for the session
-  cookie — see below.
+  `username:password` or `username:password:role` entries
+  (`alice:pass1:admin,bob:pass2`), parsed once at startup into a `Map`.
+  Two-part entries default to role `user`; a third segment must be exactly
+  `admin` or `user` or the whole entry is treated as malformed and skipped —
+  same as a 0/1-part entry or one with an empty username/password. A password
+  containing `:` is inherently ambiguous with the role suffix (is
+  `alice:a:b:admin` a password of `a:b` with role `admin`, or a malformed
+  4-part entry?) so it is also skipped rather than guessed at; this fails
+  loud (that person can't sign in, easy to notice) rather than quiet (a colon
+  silently becoming part of the password). `SESSION_SECRET` is a separate
+  signing key for the session cookie — see below.
+- **Two roles, re-verified every request, not trusted from the cookie.** The
+  session cookie's payload includes the role at issuance
+  (`{ user, role, exp }`), but `sessionIdentity()` never reads that field
+  directly for authorization — on every request it looks the *current*
+  username back up in the in-memory `Map` built from `AUTH_USERS` at startup
+  and uses that record's role. So demoting or removing someone from
+  `AUTH_USERS` (followed by a restart, since the `Map` is built once at
+  startup) invalidates their elevated access on their very next request, not
+  just their next login — a stale cookie claiming a role that no longer
+  matches the current config can't grant it. `requireAdmin` middleware
+  (mounted only on `/api/health` and the `force=1` branch of
+  `/api/analysis`) checks `req.authRole === "admin"`, returning `403` (JSON
+  on `/api/*`, a small styled HTML page — `forbiddenPageHtml()` — elsewhere)
+  when it isn't. In unconfigured (fail-open) mode there is no one to
+  distinguish, so `requireAuth` sets `req.authRole = "admin"`
+  unconditionally — everyone gets full access, matching how the rest of that
+  mode behaves.
 - **Session cookie, signed not stored.** `POST /login` validates the
   submitted credentials, then issues a cookie (`gcp_session`) whose value is
-  `base64url({ user, exp }) + "." + HMAC-SHA256(that, SESSION_SECRET)`.
+  `base64url({ user, role, exp }) + "." + HMAC-SHA256(that, SESSION_SECRET)`.
   Verifying a request recomputes the HMAC and compares it with
   `crypto.timingSafeEqual`, then checks `exp` against the current time. There
   is no server-side session store and no database — the cookie itself is the
@@ -359,9 +383,9 @@ middleware explicitly lets through.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/analysis` | Runs the full 6-stage pipeline (or serves the 5-minute cache); returns aggregates, row-level records, videos, Twitch live snapshot, Reddit community info, Gemini's per-game Reddit discussion clusters, data-source statuses, fetch errors, sentiment-engine stats, storage info, deltas, and the AI briefing. `?force=1` bypasses the cache. |
+| `GET /api/analysis` | Runs the full 6-stage pipeline (or serves the 5-minute cache); returns aggregates, row-level records, videos, Twitch live snapshot, Reddit community info, Gemini's per-game discussion clusters, data-source statuses, fetch errors, sentiment-engine stats, storage info, deltas, the AI briefing, and `viewer: { user, role }` for the signed-in session. `?force=1` bypasses the cache and re-runs paid API calls — **admin-only**, `403` for a `user` role. |
 | `GET /api/methodology` | Machine-readable documentation of the engagement formula, region signal precedence, sentiment engines/scale, the 6-stage data flow, and briefing length rationale — rendered live in the dashboard's "How is this calculated?" panel rather than requiring a separate doc. |
-| `GET /api/health` | Configuration status per platform, semantic-analysis engine/model, discussion-summary (Gemini) engine/model, `demo_data_enabled`, and snapshot storage info. |
+| `GET /api/health` | **Admin-only** (`403` for a `user` role). Configuration status per platform, semantic-analysis engine/model, discussion-summary (Gemini) engine/model, `demo_data_enabled`, snapshot storage info, and `access_control` (counts by role plus a read-only `users: [{user, role}]` roster, never passwords). |
 
 ---
 
