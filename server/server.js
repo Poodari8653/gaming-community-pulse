@@ -494,6 +494,7 @@ async function refresh() {
   const [yt, rd, dc, tw] = await Promise.all([collectYouTube(), collectReddit(), collectDiscord(), collectTwitch()]);
 
   const collected = [...yt.rows, ...rd.rows, ...dc.rows, ...tw.rows];
+  await store.saveRawRecords(collected);
   const enriched = await enrich(collected);
 
   // Sample rows only stand in for a platform that has NO live feed configured.
