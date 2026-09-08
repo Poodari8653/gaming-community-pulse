@@ -54,6 +54,7 @@ const { engagementIndex, aggregateIndex, METHODOLOGY: ENGAGEMENT_METHODOLOGY } =
 const { classifyRegion, REGIONS, METHODOLOGY: REGION_METHODOLOGY } = require("./lib/region");
 const analytics = require("./lib/analytics");
 const store = require("./lib/store");
+console.log("STORE KEYS:", Object.keys(store));
 const { generateBriefing, TARGET_WORDS } = require("./lib/briefing");
 const gemini = require("./lib/gemini");
 
