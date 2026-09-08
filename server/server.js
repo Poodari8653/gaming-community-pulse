@@ -496,6 +496,7 @@ async function refresh() {
   const collected = [...yt.rows, ...rd.rows, ...dc.rows, ...tw.rows];
   await store.saveRawRecords(collected);
   const enriched = await enrich(collected);
+  await store.saveEnrichedRecords(enriched);
 
   // Sample rows only stand in for a platform that has NO live feed configured.
   // The moment a platform goes live, its sample rows are dropped rather than
