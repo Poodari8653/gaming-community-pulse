@@ -54,7 +54,7 @@ const { engagementIndex, aggregateIndex, METHODOLOGY: ENGAGEMENT_METHODOLOGY } =
 const { classifyRegion, REGIONS, METHODOLOGY: REGION_METHODOLOGY } = require("./lib/region");
 const analytics = require("./lib/analytics");
 const store = require("./lib/store");
-console.log("STORE KEYS:", Object.keys(store));
+const supabaseStore = require("./lib/supabase-store");
 const { generateBriefing, TARGET_WORDS } = require("./lib/briefing");
 const gemini = require("./lib/gemini");
 
@@ -495,10 +495,10 @@ async function refresh() {
   const [yt, rd, dc, tw] = await Promise.all([collectYouTube(), collectReddit(), collectDiscord(), collectTwitch()]);
 
   const collected = [...yt.rows, ...rd.rows, ...dc.rows, ...tw.rows];
-  await store.saveRawRecords(collected);
+  await supabaseStore.saveRawRecords(collected);
   const enriched = await enrich(collected);
-  await store.saveEnrichedRecords(enriched);
-
+  await supabaseStore.saveEnrichedRecords(enriched);
+  
   // Sample rows only stand in for a platform that has NO live feed configured.
   // The moment a platform goes live, its sample rows are dropped rather than
   // stacked on top of real data.
