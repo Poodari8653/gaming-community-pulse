@@ -205,8 +205,6 @@
   <a class="nav-item" data-nav href="#twitchPanel">Twitch live</a>
   <a class="nav-item" data-nav href="#discussionsPanel">Discussions</a>
   <a class="nav-item" data-nav href="#rawSection">Records</a>
-  <div class="nav-divider"></div>
-  <a class="nav-item" id="adminNavItem" data-nav href="#adminPanel" style="display:none">Admin</a>
 </nav>
 <div class="main-col">
 
@@ -400,10 +398,6 @@
     <div class="method-body" id="methodBody">Loading methodology…</div>
   </details>
 
-  <details class="method" id="adminPanel" style="display:none">
-    <summary>Admin — access &amp; configuration status</summary>
-    <div class="method-body" id="adminBody">Loading…</div>
-  </details>
 </main>
 
 <footer>
@@ -509,17 +503,6 @@ function num(n){ return (Number(n)||0).toLocaleString(); }
 function signed(n){ const v = Math.round(Number(n)||0); return (v>0?"+":"") + v; }
 function sentClass(v){ return v > 15 ? "pos" : v < -15 ? "neg" : "neu"; }
 function dayOf(ts){ const d = new Date(ts); return isNaN(d) ? null : d.toISOString().slice(0,10); }
-function timeAgo(iso){
-  const d = new Date(iso);
-  if (isNaN(d)) return "";
-  const secs = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
-  if (secs < 60) return secs + "s ago";
-  const mins = Math.round(secs / 60);
-  if (mins < 60) return mins + "m ago";
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return hrs + "h ago";
-  return Math.round(hrs / 24) + "d ago";
-}
 
 // ---------------------------------------------------------------------------
 // Filtering — the single source of truth every panel reads from
@@ -1177,70 +1160,16 @@ async function loadMethodology(){
 
 // Applies what the server told us about the signed-in viewer's role. Hides
 // the force-refresh button entirely for non-admins (rather than just
-// disabling it — a disabled button invites "why can't I click this?"), and
-// lazily loads the admin panel (roster + config status from /api/health)
-// only for admins. Runs once per load(), since role can't change without a
-// fresh login.
-let adminPanelLoaded = false;
+// disabling it — a disabled button invites "why can't I click this?").
+// There's no admin-only panel or nav item in this UI anymore; a role's only
+// visible effect here is that one button. (The underlying access control —
+// force-refresh gating, /api/health being admin-only — is unchanged
+// server-side; this dashboard just no longer surfaces a page for it.)
 function applyViewer(viewer){
   const refreshBtn = document.getElementById("refreshBtn");
-  const adminPanel = document.getElementById("adminPanel");
-  const adminNavItem = document.getElementById("adminNavItem");
   if (!viewer) return;
   const role = viewer.role || "user";
-
-  if (role === "admin"){
-    refreshBtn.style.display = "";
-    adminPanel.style.display = "";
-    adminNavItem.style.display = "";
-    if (!adminPanelLoaded){
-      adminPanelLoaded = true;
-      loadAdminPanel();
-    }
-  } else {
-    refreshBtn.style.display = "none";
-    adminPanel.style.display = "none";
-    adminNavItem.style.display = "none";
-  }
-}
-
-async function loadAdminPanel(){
-  const body = document.getElementById("adminBody");
-  try{
-    const res = await fetch("/api/health");
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to load admin status");
-    const ac = data.access_control || {};
-    const rows = (ac.users || []).map(u =>
-      "<tr><td>" + esc(u.user) + "</td><td>" + esc(u.role) + "</td></tr>"
-    ).join("");
-    const errCounts = data.api_error_counts || {};
-    const errSources = Object.keys(errCounts).sort((a,b) => errCounts[b].total - errCounts[a].total);
-    const errRows = errSources.map(src => {
-      const e = errCounts[src];
-      const byStatus = Object.entries(e.by_status || {})
-        .map(([code,n]) => code + " ×" + n).join(", ");
-      const lastAgo = e.last ? timeAgo(e.last.at) : "";
-      const lastTxt = e.last
-        ? (e.last.status === 429 ? "rate limited" : "error " + (e.last.status ?? "")) + " " + lastAgo
-        : "";
-      return "<tr><td>" + esc(src) + "</td><td>" + e.total + "</td><td>" + esc(byStatus) + "</td><td>" + esc(lastTxt) + "</td></tr>";
-    }).join("");
-
-    body.innerHTML =
-      "<p><b>Access control:</b> " + (ac.configured ? "on" : "open (no AUTH_USERS set)") +
-      " — " + (ac.user_count || 0) + " user(s), " + (ac.admin_count || 0) + " admin, " +
-      (ac.viewer_count || 0) + " viewer.</p>" +
-      "<p><b>Session secret:</b> " + (ac.session_secret_set ? "set (persists across restarts)" : "not set — ephemeral, sessions reset on every restart") + "</p>" +
-      (rows ? "<table><thead><tr><th>User</th><th>Role</th></tr></thead><tbody>" + rows + "</tbody></table>" : "") +
-      "<h4>API errors since restart</h4>" +
-      (errRows
-        ? "<table><thead><tr><th>Source</th><th>Total</th><th>By status</th><th>Last</th></tr></thead><tbody>" + errRows + "</tbody></table>"
-        : "<p class=\"empty\">No API errors recorded since this process started.</p>") +
-      "<p><b>Storage:</b> " + esc(JSON.stringify(data.storage || {})) + "</p>";
-  } catch(err){
-    body.textContent = "Couldn't load admin status: " + err.message;
-  }
+  refreshBtn.style.display = role === "admin" ? "" : "none";
 }
 
 async function load(force){
