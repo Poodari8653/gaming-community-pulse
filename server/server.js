@@ -53,7 +53,34 @@ const nlp = require("./lib/nlp");
 const { engagementIndex, aggregateIndex, METHODOLOGY: ENGAGEMENT_METHODOLOGY } = require("./lib/engagement");
 const { classifyRegion, REGIONS, METHODOLOGY: REGION_METHODOLOGY } = require("./lib/region");
 const analytics = require("./lib/analytics");
-const store = require("./lib/store");
+const loadedStore = require("./lib/store");
+
+const store = {
+  storageInfo:
+    typeof loadedStore.storageInfo === "function"
+      ? loadedStore.storageInfo
+      : () => ({
+          mode: "unavailable",
+          directory: null,
+          snapshots_held: 0,
+          retention_days: 90,
+          durable: false,
+        }),
+
+  previousSnapshot:
+    typeof loadedStore.previousSnapshot === "function"
+      ? loadedStore.previousSnapshot
+      : () => null,
+
+  saveSnapshot:
+    typeof loadedStore.saveSnapshot === "function"
+      ? loadedStore.saveSnapshot
+      : () => ({
+          saved: false,
+          mode: "unavailable",
+          error: "Snapshot store unavailable",
+        }),
+};
 const supabaseStore = require("./lib/supabase-store");
 const { generateBriefing, TARGET_WORDS } = require("./lib/briefing");
 const gemini = require("./lib/gemini");
