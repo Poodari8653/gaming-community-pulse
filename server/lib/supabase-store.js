@@ -13,33 +13,55 @@ function toRecord(row, includeCollectedAt = false) {
     row.engagement ?? row.engagement_index ?? null;
 
   const record = {
-    record_key: [
-      row.platform || "",
-      row.game || "",
-      row.source || "",
-      publishedAt || "",
-      row.author || "",
-      row.url || "",
-      textContent || "",
-    ].join("|"),
+  record_key: [
+    row.platform || "",
+    row.game || "",
+    row.source || "",
+    publishedAt || "",
+    row.author || "",
+    row.url || "",
+    textContent || "",
+  ].join("|"),
 
-    platform: row.platform || null,
-    game: row.game || null,
-    source: row.source || null,
-    content_type: row.content_type || null,
-    author: row.author || null,
-    published_at: publishedAt,
-    text_content: textContent,
-    engagement,
-    sentiment,
-    sentiment_score: row.sentiment_score ?? null,
-    language: row.language || null,
-    region: row.region || null,
-    url: row.url || null,
-    raw_data: row,
-    updated_at: new Date().toISOString(),
-  };
+  platform: row.platform || null,
+  game: row.game || null,
+  source: row.source || null,
+  content_type: row.content_type || null,
+  author: row.author || null,
+  published_at: publishedAt,
+  text_content: textContent,
 
+  engagement,
+  sentiment,
+  sentiment_score: row.sentiment_score ?? null,
+
+  language: row.language || null,
+  region: row.region || null,
+
+  url: row.url || null,
+
+  data_type: row.data_type || null,
+  is_sample: Boolean(row.is_sample),
+
+  native_score: row.native_score ?? row.score ?? null,
+  num_comments: row.num_comments ?? null,
+
+  theme: row.theme || null,
+  engagement_index: row.engagement_index ?? null,
+
+  sentiment_confidence: row.sentiment_confidence ?? null,
+  sentiment_method: row.sentiment_method || null,
+
+  sarcasm: Boolean(row.sarcasm),
+  is_question: Boolean(row.is_question),
+  is_risk: Boolean(row.is_risk),
+
+  region_source: row.region_source || null,
+  region_confidence: row.region_confidence ?? null,
+
+  raw_data: row,
+  updated_at: new Date().toISOString(),
+};
   if (includeCollectedAt) {
     record.collected_at = new Date().toISOString();
   }
