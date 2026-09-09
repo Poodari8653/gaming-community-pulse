@@ -24,6 +24,7 @@
 
 const AUTH_URL = "https://www.reddit.com/api/v1/access_token";
 const API_BASE = "https://oauth.reddit.com";
+const apiStats = require("./apiStats");
 
 const USER_AGENT =
   process.env.REDDIT_USER_AGENT ||
@@ -61,7 +62,9 @@ async function getAppAccessToken(clientId, clientSecret) {
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.access_token) {
-    throw new Error(json.error_description || json.error || `Reddit token request failed (${res.status})`);
+    const message = json.error_description || json.error || `Reddit token request failed (${res.status})`;
+    apiStats.recordApiError("reddit", res.status, message);
+    throw new Error(message);
   }
 
   cachedToken = { token: json.access_token, expiresAt: Date.now() + (json.expires_in || 3600) * 1000 };
@@ -74,7 +77,9 @@ async function redditGet(path, token) {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Reddit API ${res.status} on ${path}${text ? `: ${text.slice(0, 160)}` : ""}`);
+    const message = `Reddit API ${res.status} on ${path}${text ? `: ${text.slice(0, 160)}` : ""}`;
+    apiStats.recordApiError("reddit", res.status, message);
+    throw new Error(message);
   }
   return res.json();
 }

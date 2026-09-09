@@ -8,6 +8,7 @@
 // message content comes back empty even if the call itself succeeds.
 
 const BASE = "https://discord.com/api/v10";
+const apiStats = require("./apiStats");
 
 async function discordGet(path, botToken) {
   const res = await fetch(`${BASE}${path}`, {
@@ -16,6 +17,7 @@ async function discordGet(path, botToken) {
   const body = await res.json();
   if (!res.ok) {
     const msg = body?.message || `Discord API request failed (${res.status})`;
+    apiStats.recordApiError("discord", res.status, msg);
     throw new Error(`${msg} (code ${body?.code ?? res.status})`);
   }
   return body;

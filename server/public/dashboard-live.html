@@ -7,27 +7,53 @@
 <script src="/vendor/chart.umd.min.js"></script>
 <style>
   :root{
+    --bg:#f7f5f2; --panel:#ffffff; --panel-2:#f1efe9; --border:#e5e2da;
+    --text:#211f1c; --muted:#6b6864; --dim:#96938c;
+    --accent:#c0392b; --accent-2:#a5301f; --accent-tint:#fbe9e6;
+    --pos:#1f9d55; --neg:#c0392b; --neu:#a3720f; --alert:#c2610c;
+    --radius:12px; --sidebar-w:216px;
+  }
+  html[data-theme="dark"]{
     --bg:#0f1117; --panel:#171a24; --panel-2:#1c202c; --border:#262b3a;
     --text:#e8eaf0; --muted:#9aa1b4; --dim:#6f7688;
-    --accent:#6c8cff; --pos:#3ecf8e; --neg:#ff6b6b; --neu:#f5c451; --alert:#ff9f6c;
-    --radius:12px;
+    --accent:#e2574c; --accent-2:#c0392b; --accent-tint:rgba(226,87,76,.16);
+    --pos:#3ecf8e; --neg:#ff6b6b; --neu:#f5c451; --alert:#ff9f6c;
   }
   *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--text);
     font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  [id]{scroll-margin-top:88px}
 
   a{color:var(--accent)}
   a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{
     outline:3px solid var(--accent); outline-offset:2px; border-radius:4px;
   }
-  .skip-link{position:absolute;left:-9999px;top:0;background:var(--accent);color:#0b0d13;
+  .skip-link{position:absolute;left:-9999px;top:0;background:var(--accent);color:#fff;
     padding:10px 16px;z-index:100;font-weight:700;border-radius:0 0 8px 0}
   .skip-link:focus{left:0}
   .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
     clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
+  /* ---- App shell: sidebar + main column ---- */
+  .app-shell{display:flex;align-items:flex-start;min-height:100vh}
+  .sidebar{position:sticky;top:0;flex:0 0 var(--sidebar-w);width:var(--sidebar-w);height:100vh;
+    overflow-y:auto;background:var(--panel);border-right:1px solid var(--border);
+    padding:18px 12px;display:flex;flex-direction:column;gap:2px}
+  .sidebar .brand{display:flex;align-items:center;gap:9px;padding:4px 8px 18px}
+  .sidebar .brand-mark{width:28px;height:28px;border-radius:7px;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:0 0 auto}
+  .sidebar .brand-name{font-size:14px;font-weight:700;letter-spacing:-.1px}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;
+    color:var(--muted);font-size:13.5px;font-weight:600;text-decoration:none;border-left:3px solid transparent}
+  .nav-item:hover{background:var(--panel-2);color:var(--text)}
+  .nav-item.active{background:var(--accent-tint);color:var(--accent-2);border-left-color:var(--accent)}
+  .nav-divider{height:1px;background:var(--border);margin:10px 6px}
+  .main-col{flex:1 1 auto;min-width:0}
+
   header.site{padding:22px 28px 16px;border-bottom:1px solid var(--border);
-    display:flex;flex-wrap:wrap;gap:16px;align-items:baseline;justify-content:space-between}
+    display:flex;flex-wrap:wrap;gap:16px;align-items:baseline;justify-content:space-between;
+    background:var(--panel)}
   header.site h1{margin:0;font-size:20px;letter-spacing:-.2px}
   header.site p{margin:4px 0 0;color:var(--muted);font-size:13px}
   .header-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
@@ -37,33 +63,41 @@
     border-radius:8px;padding:8px 14px;font-size:13px}
   .btn:hover{border-color:var(--accent)}
   .btn[disabled]{opacity:.5;cursor:not-allowed}
-  .btn-primary{background:var(--accent);color:#0b0d13;border-color:var(--accent);font-weight:600}
+  .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .btn-primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+  .btn-icon{display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0}
 
-  /* ---- Global filter bar: media channel, product/game, time range, region ---- */
-  .filterbar{position:sticky;top:0;z-index:20;background:rgba(15,17,23,.96);
-    backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:14px 28px}
-  .filter-grid{display:grid;gap:14px 26px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:start}
-  .filter-group{display:block}
-  .filter-group > .filter-label{display:block;font-size:11px;text-transform:uppercase;
-    letter-spacing:.9px;color:var(--dim);margin-bottom:7px;font-weight:700}
+  /* ---- Global filter bar: media channel, product/game, time range, region ----
+     Deliberately one compact row, not the label-above-select grid this used to
+     be: these four controls apply to every section on the page, so they earn a
+     permanent sliver of sticky header space, but not a whole banded strip of it. */
+  .filterbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.96);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:8px 28px}
+  html[data-theme="dark"] .filterbar{background:rgba(15,17,23,.96)}
+  .filter-grid{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+  .filter-group{display:flex;align-items:center;gap:7px}
+  .filter-group > .filter-label{font-size:11px;text-transform:uppercase;
+    letter-spacing:.6px;color:var(--dim);font-weight:700;white-space:nowrap}
   select,input[type="date"],input[type="text"]{background:var(--panel);color:var(--text);
-    border:1px solid var(--border);border-radius:8px;padding:8px 11px;font:inherit;font-size:13px}
-  select{width:100%;appearance:none;-webkit-appearance:none;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239aa1b4'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;background-position:right 12px center;padding-right:30px}
+    border:1px solid var(--border);border-radius:7px;padding:5px 10px;font:inherit;font-size:12.5px}
+  select{appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b6864'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 10px center;padding-right:26px}
   select:hover{border-color:var(--accent)}
-  .filter-grid select{max-width:260px}
+  .filter-grid select{width:auto;max-width:170px}
   .range-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-  .range-row select{width:auto;min-width:130px;flex:0 0 auto}
-  .range-row input[type="date"]{flex:1 1 128px;min-width:128px}
-  .filter-summary{margin-top:12px;font-size:12.5px;color:var(--muted)}
+  .range-row select{min-width:104px;flex:0 0 auto}
+  .range-row input[type="date"]{width:122px}
+  .filter-summary{margin:6px 0 0;font-size:12px;color:var(--muted)}
   .filter-summary b{color:var(--text)}
 
   main{padding:22px 28px 60px;max-width:1500px;margin:0 auto}
   .banner{border:1px solid var(--border);background:var(--panel);border-radius:10px;
     padding:11px 15px;font-size:12.5px;color:var(--muted);margin-bottom:16px}
-  .banner.error{border-color:#5a2a2a;background:#241618;color:#ffbcbc}
-  .banner.warn{border-color:#5a4a22;background:#241f16;color:#ffdca8}
+  .banner.error{border-color:#f0b8b3;background:#fdeceb;color:#9a2c22}
+  .banner.warn{border-color:#ecd49a;background:#fdf6e3;color:#8a5f09}
+  html[data-theme="dark"] .banner.error{border-color:#5a2a2a;background:#241618;color:#ffbcbc}
+  html[data-theme="dark"] .banner.warn{border-color:#5a4a22;background:#241f16;color:#ffdca8}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
 
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
@@ -77,21 +111,27 @@
   .grid-3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
 
   /* ---- Daily briefing ---- */
-  .briefing{background:linear-gradient(160deg,#1a1f2e 0%,#171a24 60%);border-color:#2e3550}
+  .briefing{background:linear-gradient(160deg,#fdf1ef 0%,#ffffff 55%);border-color:#f3d9d4}
+  html[data-theme="dark"] .briefing{background:linear-gradient(160deg,#241a18 0%,#171a24 55%);border-color:#3a2420}
   .briefing .headline{font-size:22px;line-height:1.35;font-weight:700;margin:2px 0 12px;letter-spacing:-.3px}
-  .briefing .narrative{font-size:15px;line-height:1.7;color:#d7dbe6;max-width:76ch;margin:0 0 6px}
+  .briefing .narrative{font-size:15px;line-height:1.7;color:#3a3733;max-width:76ch;margin:0 0 6px}
+  html[data-theme="dark"] .briefing .narrative{color:#d7dbe6}
   .brief-meta{font-size:11.5px;color:var(--dim);margin-top:10px}
   .brief-cols{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:20px}
-  .brief-col{background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:10px;padding:14px 15px}
+  .brief-col{background:rgba(255,255,255,.6);border:1px solid var(--border);border-radius:10px;padding:14px 15px}
+  html[data-theme="dark"] .brief-col{background:rgba(0,0,0,.22)}
   .brief-item{padding:9px 0;border-bottom:1px solid var(--border)}
   .brief-item:last-child{border-bottom:0;padding-bottom:0}
   .brief-item .t{font-weight:600;font-size:13.5px}
   .brief-item .d{color:var(--muted);font-size:12.5px;margin-top:3px}
   .sev{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.6px;
     padding:2px 7px;border-radius:5px;font-weight:700;margin-left:6px}
-  .sev.high{background:#4a1e1e;color:#ff9d9d}
-  .sev.medium{background:#4a3a1e;color:#ffcf8f}
-  .sev.low{background:#26333f;color:#9fc6e0}
+  .sev.high{background:#fbe1de;color:#a3281c}
+  .sev.medium{background:#fdf0d5;color:#8a5f09}
+  .sev.low{background:#e3f0fb;color:#1c5a8a}
+  html[data-theme="dark"] .sev.high{background:#4a1e1e;color:#ff9d9d}
+  html[data-theme="dark"] .sev.medium{background:#4a3a1e;color:#ffcf8f}
+  html[data-theme="dark"] .sev.low{background:#26333f;color:#9fc6e0}
   .empty{color:var(--dim);font-size:12.5px;font-style:italic}
 
   /* ---- KPIs ---- */
@@ -107,11 +147,15 @@
   th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.6px}
   .scroll{max-height:380px;overflow-y:auto}
   .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600}
-  .tag.positive{background:#123527;color:var(--pos)}
-  .tag.negative{background:#3a1a1a;color:var(--neg)}
-  .tag.neutral{background:#3a331a;color:var(--neu)}
+  .tag.positive{background:#e4f5ea;color:var(--pos)}
+  .tag.negative{background:#fbe4e2;color:var(--neg)}
+  .tag.neutral{background:#fbf0da;color:var(--neu)}
+  html[data-theme="dark"] .tag.positive{background:#123527}
+  html[data-theme="dark"] .tag.negative{background:#3a1a1a}
+  html[data-theme="dark"] .tag.neutral{background:#3a331a}
   .pill{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 7px;white-space:nowrap}
-  .pill.sample{border-color:#5a4a22;color:#ffdca8}
+  .pill.sample{border-color:#ecd49a;background:#fdf6e3;color:#8a5f09}
+  html[data-theme="dark"] .pill.sample{border-color:#5a4a22;background:transparent;color:#ffdca8}
   .bar{height:6px;background:var(--panel-2);border-radius:3px;overflow:hidden;min-width:70px;margin-top:5px}
   .bar > span{display:block;height:100%;background:var(--neg)}
 
@@ -127,16 +171,18 @@
   .method-body{padding:0 20px 20px}
   .method-body h4{margin:18px 0 6px;font-size:13px}
   .method-body p,.method-body li{font-size:13px;color:var(--muted);line-height:1.65}
-  .method-body code{background:var(--panel-2);padding:2px 6px;border-radius:4px;font-size:12px;color:#cbd3ff}
+  .method-body code{background:var(--panel-2);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--accent-2)}
+  html[data-theme="dark"] .method-body code{color:#ff8a7a}
 
-  #loading{position:fixed;inset:0;background:rgba(15,17,23,.93);display:flex;
+  #loading{position:fixed;inset:0;background:rgba(255,255,255,.93);display:flex;
     align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:60;font-size:14px;color:var(--muted)}
+  html[data-theme="dark"] #loading{background:rgba(15,17,23,.93)}
   .spinner{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--accent);
     border-radius:50%;animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
 
-  footer{color:var(--dim);font-size:12px;padding:24px 28px 44px;border-top:1px solid var(--border)}
+  footer{color:var(--muted);font-size:12px;padding:24px 28px 44px;border-top:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -148,14 +194,33 @@
   <div>Collecting and scoring community data…</div>
 </div>
 
+<div class="app-shell">
+<nav class="sidebar" aria-label="Section navigation">
+  <div class="brand"><span class="brand-mark" aria-hidden="true">RS</span><span class="brand-name">Community Pulse</span></div>
+  <a class="nav-item" data-nav href="#briefing">Overview</a>
+  <a class="nav-item" data-nav href="#trendsSection">Trends</a>
+  <a class="nav-item" data-nav href="#engagementSection">Engagement</a>
+  <a class="nav-item" data-nav href="#themesSection">Themes &amp; regions</a>
+  <a class="nav-item" data-nav href="#qaSection">Questions &amp; top posts</a>
+  <a class="nav-item" data-nav href="#twitchPanel">Twitch live</a>
+  <a class="nav-item" data-nav href="#discussionsPanel">Discussions</a>
+  <a class="nav-item" data-nav href="#rawSection">Records</a>
+  <div class="nav-divider"></div>
+  <a class="nav-item" id="adminNavItem" data-nav href="#adminPanel" style="display:none">Admin</a>
+</nav>
+<div class="main-col">
+
 <header class="site">
   <div>
     <h1>Gaming Community Pulse</h1>
     <p>Daily briefing on public gaming discussion across YouTube, Reddit, Discord and Twitch.</p>
   </div>
   <div class="header-actions">
-    <span id="viewerPill" class="pill" style="display:none"></span>
     <span id="lastUpdated" class="pill"></span>
+    <button class="btn btn-icon" id="themeToggle" type="button" aria-pressed="false" aria-label="Switch to dark theme">
+      <svg id="themeIconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+      <svg id="themeIconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
     <button class="btn btn-primary" id="refreshBtn" type="button">Refresh data</button>
     <a class="btn" id="logoutLink" href="/logout">Log out</a>
   </div>
@@ -206,7 +271,7 @@
   <h2 class="visually-hidden">Headline metrics</h2>
   <div class="kpis" id="kpiRow" aria-live="polite"></div>
 
-  <div class="grid grid-2">
+  <div class="grid grid-2" id="trendsSection">
     <section class="panel" aria-labelledby="vol-h">
       <h2 id="vol-h">Discussion volume &amp; sentiment over time</h2>
       <p class="desc">Volume bars with mean sentiment overlaid. Statistically detected spikes are listed underneath.</p>
@@ -223,7 +288,7 @@
     </section>
   </div>
 
-  <div class="grid grid-2">
+  <div class="grid grid-2" id="engagementSection">
     <section class="panel" aria-labelledby="eng-h">
       <h2 id="eng-h">Engagement Index by game</h2>
       <p class="desc">Mean index, 0–100, normalised per platform so games are genuinely comparable. See the methodology panel for the formula.</p>
@@ -244,7 +309,7 @@
     </section>
   </div>
 
-  <div class="grid grid-2">
+  <div class="grid grid-2" id="themesSection">
     <section class="panel" aria-labelledby="theme-h">
       <h2 id="theme-h">Recurring themes</h2>
       <p class="desc">Assigned by semantic analysis from a controlled vocabulary, so themes aggregate across all four channels.</p>
@@ -271,7 +336,7 @@
     </section>
   </div>
 
-  <div class="grid grid-2">
+  <div class="grid grid-2" id="qaSection">
     <section class="panel" aria-labelledby="q-h">
       <h2 id="q-h">Recurring questions</h2>
       <p class="desc">Clustered by topic — "asked N×" counts how many separate people asked the same thing. A ready-made content shortlist.</p>
@@ -297,7 +362,7 @@
     <div id="discussionsBody"></div>
   </section>
 
-  <section class="panel" aria-labelledby="raw-h">
+  <section class="panel" id="rawSection" aria-labelledby="raw-h">
     <h2 id="raw-h">Browse the underlying records</h2>
     <p class="desc">Every figure above traces back to rows here. Sample rows are tagged.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -347,6 +412,9 @@
   methodology and recommendations.
 </footer>
 
+</div>
+</div>
+
 <script>
 "use strict";
 
@@ -364,7 +432,63 @@ const filters = {
   to: null,
 };
 const charts = {};
-const COLORS = ["#6c8cff","#3ecf8e","#f5c451","#ff6b6b","#b98cff","#4dd0e1","#ff9f6c"];
+
+// ---------------------------------------------------------------------------
+// Theme — chart colors live here rather than as literals in each render
+// function, because Chart.js bakes colors into the chart at construction
+// time. Switching themes re-renders every chart from scratch (see
+// toggleTheme), and each render call reads currentPalette() fresh so it
+// always matches whatever theme is active *right now*.
+// ---------------------------------------------------------------------------
+const THEME_KEY = "gcp_theme";
+const CHART_PALETTES = {
+  light: {
+    categorical: ["#c0392b","#1f9d55","#d4a017","#4d8fd6","#9b6bb5","#2f9e9e","#e07b39"],
+    tick:"#6b6864", grid:"#e5e2da", axisTitle:"#96938c",
+    pos:"#1f9d55", neu:"#d4a017", neg:"#c0392b",
+    volumeBar:"#c0392b55", volumeBarBorder:"#c0392b", spike:"#e0781f", sentimentLine:"#1f9d55",
+    healthLive:"#1f9d55", healthFailed:"#c2610c", healthOff:"#96938c", healthFailedText:"#8a5f09",
+  },
+  dark: {
+    categorical: ["#e2574c","#3ecf8e","#f5c451","#6ea8ff","#c79bf0","#4dd0e1","#ff9f6c"],
+    tick:"#9aa1b4", grid:"#262b3a", axisTitle:"#6f7688",
+    pos:"#3ecf8e", neu:"#f5c451", neg:"#ff6b6b",
+    volumeBar:"#e2574c55", volumeBarBorder:"#e2574c", spike:"#ff9f6c", sentimentLine:"#3ecf8e",
+    healthLive:"#3ecf8e", healthFailed:"#ff9f6c", healthOff:"#6f7688", healthFailedText:"#ffdca8",
+  },
+};
+function currentTheme(){
+  return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+}
+function currentPalette(){ return CHART_PALETTES[currentTheme()]; }
+
+function applyTheme(theme){
+  document.documentElement.setAttribute("data-theme", theme);
+  const btn = document.getElementById("themeToggle");
+  const isDark = theme === "dark";
+  document.getElementById("themeIconSun").style.display = isDark ? "none" : "";
+  document.getElementById("themeIconMoon").style.display = isDark ? "" : "none";
+  btn.setAttribute("aria-pressed", String(isDark));
+  btn.setAttribute("aria-label", isDark ? "Switch to light theme" : "Switch to dark theme");
+}
+
+function toggleTheme(){
+  const next = currentTheme() === "dark" ? "light" : "dark";
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+  // Chart.js draws colors onto a <canvas> at construction time, so a CSS
+  // variable flip alone won't re-color existing charts — re-running the
+  // same render pass the rest of the page uses is simpler and more
+  // reliable than hand-patching each chart instance's dataset colors.
+  if (DATA){ render(); renderBanners(); }
+}
+
+(function initTheme(){
+  const stored = localStorage.getItem(THEME_KEY);
+  const theme = stored || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  applyTheme(theme);
+})();
+document.getElementById("themeToggle").addEventListener("click", toggleTheme);
 const PRESETS = [
   { id:"1d", label:"Today", days:1 },
   { id:"7d", label:"7 days", days:7 },
@@ -385,6 +509,17 @@ function num(n){ return (Number(n)||0).toLocaleString(); }
 function signed(n){ const v = Math.round(Number(n)||0); return (v>0?"+":"") + v; }
 function sentClass(v){ return v > 15 ? "pos" : v < -15 ? "neg" : "neu"; }
 function dayOf(ts){ const d = new Date(ts); return isNaN(d) ? null : d.toISOString().slice(0,10); }
+function timeAgo(iso){
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const secs = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
+  if (secs < 60) return secs + "s ago";
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return mins + "m ago";
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs + "h ago";
+  return Math.round(hrs / 24) + "d ago";
+}
 
 // ---------------------------------------------------------------------------
 // Filtering — the single source of truth every panel reads from
@@ -622,26 +757,27 @@ function renderVolume(rows){
   const spikes = detectSpikes(series);
   const spikeKeys = new Set(spikes.map(s=>s.key));
 
+  const pal = currentPalette();
   if (charts.volume) charts.volume.destroy();
   charts.volume = new Chart(document.getElementById("volumeChart"), {
     data:{
       labels: series.map(s=>s.key),
       datasets:[
         { type:"bar", label:"Records", data:series.map(s=>s.count), yAxisID:"y",
-          backgroundColor: series.map(s => spikeKeys.has(s.key) ? "#ff9f6c" : "#6c8cff88"),
-          borderColor: series.map(s => spikeKeys.has(s.key) ? "#ff9f6c" : "#6c8cff"), borderWidth:1 },
+          backgroundColor: series.map(s => spikeKeys.has(s.key) ? pal.spike : pal.volumeBar),
+          borderColor: series.map(s => spikeKeys.has(s.key) ? pal.spike : pal.volumeBarBorder), borderWidth:1 },
         { type:"line", label:"Mean sentiment", data:series.map(s=>s.sentiment), yAxisID:"y1",
-          borderColor:"#3ecf8e", backgroundColor:"#3ecf8e", tension:.3, pointRadius:2, fill:false },
+          borderColor:pal.sentimentLine, backgroundColor:pal.sentimentLine, tension:.3, pointRadius:2, fill:false },
       ]
     },
     options:{ responsive:true, interaction:{mode:"index",intersect:false},
-      plugins:{ legend:{labels:{color:"#9aa1b4"}} },
+      plugins:{ legend:{labels:{color:pal.tick}} },
       scales:{
-        x:{ ticks:{color:"#9aa1b4",maxTicksLimit:12}, grid:{color:"#262b3a"} },
-        y:{ position:"left", beginAtZero:true, ticks:{color:"#9aa1b4"}, grid:{color:"#262b3a"},
-            title:{display:true,text:"Records",color:"#6f7688"} },
-        y1:{ position:"right", min:-100, max:100, ticks:{color:"#9aa1b4"}, grid:{display:false},
-            title:{display:true,text:"Sentiment",color:"#6f7688"} },
+        x:{ ticks:{color:pal.tick,maxTicksLimit:12}, grid:{color:pal.grid} },
+        y:{ position:"left", beginAtZero:true, ticks:{color:pal.tick}, grid:{color:pal.grid},
+            title:{display:true,text:"Records",color:pal.axisTitle} },
+        y1:{ position:"right", min:-100, max:100, ticks:{color:pal.tick}, grid:{display:false},
+            title:{display:true,text:"Sentiment",color:pal.axisTitle} },
       } }
   });
 
@@ -669,16 +805,17 @@ function renderSentimentChart(rows){
     neu.push(gr.filter(r=>r.sentiment_label==="neutral").length);
     neg.push(gr.filter(r=>r.sentiment_label==="negative").length);
   }
+  const pal = currentPalette();
   if (charts.sentiment) charts.sentiment.destroy();
   charts.sentiment = new Chart(document.getElementById("sentimentChart"), {
     type:"bar",
     data:{ labels:games, datasets:[
-      { label:"Positive", data:pos, backgroundColor:"#3ecf8e" },
-      { label:"Neutral", data:neu, backgroundColor:"#f5c451" },
-      { label:"Negative", data:neg, backgroundColor:"#ff6b6b" }]},
-    options:{ responsive:true, plugins:{legend:{labels:{color:"#9aa1b4"}}},
-      scales:{ x:{stacked:true,ticks:{color:"#9aa1b4"},grid:{display:false}},
-               y:{stacked:true,ticks:{color:"#9aa1b4"},grid:{color:"#262b3a"}} } }
+      { label:"Positive", data:pos, backgroundColor:pal.pos },
+      { label:"Neutral", data:neu, backgroundColor:pal.neu },
+      { label:"Negative", data:neg, backgroundColor:pal.neg }]},
+    options:{ responsive:true, plugins:{legend:{labels:{color:pal.tick}}},
+      scales:{ x:{stacked:true,ticks:{color:pal.tick},grid:{display:false}},
+               y:{stacked:true,ticks:{color:pal.tick},grid:{color:pal.grid}} } }
   });
   document.getElementById("sentimentTable").innerHTML =
     '<table><caption>Sentiment mix by game</caption><thead><tr><th scope="col">Game</th>' +
@@ -690,14 +827,15 @@ function renderSentimentChart(rows){
 function renderEngagementChart(rows){
   const games = [...new Set(rows.map(r=>r.game))].sort();
   const values = games.map(g => summarise(rows.filter(r=>r.game===g)).engagement);
+  const pal = currentPalette();
   if (charts.engagement) charts.engagement.destroy();
   charts.engagement = new Chart(document.getElementById("engagementChart"), {
     type:"bar",
     data:{ labels:games, datasets:[{ label:"Mean Engagement Index", data:values,
-      backgroundColor: games.map((_,i)=>COLORS[i%COLORS.length]) }]},
+      backgroundColor: games.map((_,i)=>pal.categorical[i%pal.categorical.length]) }]},
     options:{ indexAxis:"y", responsive:true, plugins:{legend:{display:false}},
-      scales:{ x:{beginAtZero:true,max:100,ticks:{color:"#9aa1b4"},grid:{color:"#262b3a"}},
-               y:{ticks:{color:"#9aa1b4"},grid:{display:false}} } }
+      scales:{ x:{beginAtZero:true,max:100,ticks:{color:pal.tick},grid:{color:pal.grid}},
+               y:{ticks:{color:pal.tick},grid:{display:false}} } }
   });
   document.getElementById("engagementTable").innerHTML =
     '<table><caption>Mean Engagement Index by game</caption><thead><tr><th scope="col">Game</th>' +
@@ -938,7 +1076,8 @@ function renderBanners(){
   // Three states, not two. "Configured but failing" needs a different colour
   // from "not set up" because it demands a different action: fix a credential
   // versus add one. Green must mean data actually arrived.
-  const COLOR = { live:"#3ecf8e", failed:"#ff9f6c", off:"#6f7688" };
+  const pal = currentPalette();
+  const COLOR = { live:pal.healthLive, failed:pal.healthFailed, off:pal.healthOff };
   const stateOf = v => String(v).startsWith("live") ? "live"
     : String(v).startsWith("configured but") ? "failed" : "off";
   const dot = state => '<span class="dot" style="background:' + COLOR[state] + '"></span>';
@@ -946,7 +1085,7 @@ function renderBanners(){
   const rows = Object.entries(ds).map(([k,v]) => {
     const st = stateOf(v);
     return dot(st) + '<b>' + esc(k[0].toUpperCase()+k.slice(1)) + ':</b> ' +
-      '<span' + (st === "failed" ? ' style="color:#ffdca8"' : '') + '>' + esc(v) + '</span>';
+      '<span' + (st === "failed" ? ' style="color:' + pal.healthFailedText + '"' : '') + '>' + esc(v) + '</span>';
   });
 
   if (DATA.sentiment_engine){
@@ -1036,28 +1175,24 @@ async function loadMethodology(){
   }
 }
 
-// Applies what the server told us about the signed-in viewer: shows a
-// "Signed in as X (role)" pill, hides the force-refresh button entirely for
-// non-admins (rather than just disabling it — a disabled button invites
-// "why can't I click this?"), and lazily loads the admin panel (roster +
-// config status from /api/health) only for admins. Runs once per load(),
-// since role can't change without a fresh login.
+// Applies what the server told us about the signed-in viewer's role. Hides
+// the force-refresh button entirely for non-admins (rather than just
+// disabling it — a disabled button invites "why can't I click this?"), and
+// lazily loads the admin panel (roster + config status from /api/health)
+// only for admins. Runs once per load(), since role can't change without a
+// fresh login.
 let adminPanelLoaded = false;
 function applyViewer(viewer){
-  const pill = document.getElementById("viewerPill");
   const refreshBtn = document.getElementById("refreshBtn");
   const adminPanel = document.getElementById("adminPanel");
-  if (!viewer){
-    pill.style.display = "none";
-    return;
-  }
+  const adminNavItem = document.getElementById("adminNavItem");
+  if (!viewer) return;
   const role = viewer.role || "user";
-  pill.style.display = "inline-block";
-  pill.textContent = "Signed in as " + viewer.user + " (" + role + ")";
 
   if (role === "admin"){
     refreshBtn.style.display = "";
     adminPanel.style.display = "";
+    adminNavItem.style.display = "";
     if (!adminPanelLoaded){
       adminPanelLoaded = true;
       loadAdminPanel();
@@ -1065,6 +1200,7 @@ function applyViewer(viewer){
   } else {
     refreshBtn.style.display = "none";
     adminPanel.style.display = "none";
+    adminNavItem.style.display = "none";
   }
 }
 
@@ -1078,12 +1214,29 @@ async function loadAdminPanel(){
     const rows = (ac.users || []).map(u =>
       "<tr><td>" + esc(u.user) + "</td><td>" + esc(u.role) + "</td></tr>"
     ).join("");
+    const errCounts = data.api_error_counts || {};
+    const errSources = Object.keys(errCounts).sort((a,b) => errCounts[b].total - errCounts[a].total);
+    const errRows = errSources.map(src => {
+      const e = errCounts[src];
+      const byStatus = Object.entries(e.by_status || {})
+        .map(([code,n]) => code + " ×" + n).join(", ");
+      const lastAgo = e.last ? timeAgo(e.last.at) : "";
+      const lastTxt = e.last
+        ? (e.last.status === 429 ? "rate limited" : "error " + (e.last.status ?? "")) + " " + lastAgo
+        : "";
+      return "<tr><td>" + esc(src) + "</td><td>" + e.total + "</td><td>" + esc(byStatus) + "</td><td>" + esc(lastTxt) + "</td></tr>";
+    }).join("");
+
     body.innerHTML =
       "<p><b>Access control:</b> " + (ac.configured ? "on" : "open (no AUTH_USERS set)") +
       " — " + (ac.user_count || 0) + " user(s), " + (ac.admin_count || 0) + " admin, " +
       (ac.viewer_count || 0) + " viewer.</p>" +
       "<p><b>Session secret:</b> " + (ac.session_secret_set ? "set (persists across restarts)" : "not set — ephemeral, sessions reset on every restart") + "</p>" +
       (rows ? "<table><thead><tr><th>User</th><th>Role</th></tr></thead><tbody>" + rows + "</tbody></table>" : "") +
+      "<h4>API errors since restart</h4>" +
+      (errRows
+        ? "<table><thead><tr><th>Source</th><th>Total</th><th>By status</th><th>Last</th></tr></thead><tbody>" + errRows + "</tbody></table>"
+        : "<p class=\"empty\">No API errors recorded since this process started.</p>") +
       "<p><b>Storage:</b> " + esc(JSON.stringify(data.storage || {})) + "</p>";
   } catch(err){
     body.textContent = "Couldn't load admin status: " + err.message;
@@ -1134,6 +1287,28 @@ document.getElementById("rangeTo").addEventListener("change", e => { filters.to 
 
 loadMethodology();
 load(false);
+
+// Sidebar section nav: highlight whichever section is currently in view.
+// Anchors already work via native #hash scrolling; this just keeps the
+// left nav's "active" state honest as the user scrolls, the same way an
+// app with real routes would highlight the current page.
+(function initSidebarNav(){
+  const navItems = [...document.querySelectorAll(".nav-item[data-nav]")];
+  const targets = navItems
+    .map(a => ({ a, el: document.getElementById(a.getAttribute("href").slice(1)) }))
+    .filter(t => t.el);
+  if (!targets.length) return;
+  const setActive = id => {
+    for (const { a } of targets) a.classList.toggle("active", a.getAttribute("href") === "#" + id);
+  };
+  const io = new IntersectionObserver(entries => {
+    const visible = entries.filter(e => e.isIntersecting)
+      .sort((x,y) => x.boundingClientRect.top - y.boundingClientRect.top);
+    if (visible.length) setActive(visible[0].target.id);
+  }, { rootMargin: "-15% 0px -70% 0px", threshold: 0 });
+  for (const { el } of targets) io.observe(el);
+  setActive(targets[0].el.id);
+})();
 </script>
 </body>
 </html>

@@ -12,6 +12,7 @@
 
 const AUTH_BASE = "https://id.twitch.tv/oauth2/token";
 const API_BASE = "https://api.twitch.tv/helix";
+const apiStats = require("./apiStats");
 
 let cachedToken = null; // { token, expiresAt }
 
@@ -19,7 +20,9 @@ async function getJson(url, headers) {
   const res = await fetch(url, { headers });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body?.message || `Twitch API request failed (${res.status})`);
+    const message = body?.message || `Twitch API request failed (${res.status})`;
+    apiStats.recordApiError("twitch", res.status, message);
+    throw new Error(message);
   }
   return body;
 }
@@ -44,7 +47,9 @@ async function getAppAccessToken(clientId, clientSecret) {
   });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body?.message || `Twitch token request failed (${res.status})`);
+    const message = body?.message || `Twitch token request failed (${res.status})`;
+    apiStats.recordApiError("twitch", res.status, message);
+    throw new Error(message);
   }
   cachedToken = { token: body.access_token, expiresAt: Date.now() + body.expires_in * 1000 };
   return cachedToken.token;

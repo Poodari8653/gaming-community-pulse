@@ -11,12 +11,15 @@
 // which is far cheaper and gives the same result for this use case.
 
 const BASE = "https://www.googleapis.com/youtube/v3";
+const apiStats = require("./apiStats");
 
 async function getJson(url) {
   const res = await fetch(url);
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body?.error?.message || `YouTube API request failed (${res.status})`);
+    const message = body?.error?.message || `YouTube API request failed (${res.status})`;
+    apiStats.recordApiError("youtube", res.status, message);
+    throw new Error(message);
   }
   return body;
 }

@@ -56,6 +56,7 @@ const analytics = require("./lib/analytics");
 const store = require("./lib/store");
 const { generateBriefing, TARGET_WORDS } = require("./lib/briefing");
 const gemini = require("./lib/gemini");
+const apiStats = require("./lib/apiStats");
 
 const channelConfig = require("./config/channels.json");
 const discordChannelConfig = require("./config/discord_channels.json");
@@ -709,6 +710,11 @@ app.get("/api/health", auth.requireAdmin, (req, res) => {
     discussion_summary: { configured: gemini.isConfigured(), model: gemini.isConfigured() ? gemini.MODEL : null, engine: "Gemini", scope: "All live platforms (never sample)" },
     demo_data_enabled: DEMO_DATA,
     storage: store.storageInfo(),
+    // Running counts of failed platform/AI API calls since this process
+    // started — 429s (rate limits) included, keyed by status code. Resets
+    // on restart, same as the in-memory cache; this is a live quota signal
+    // for an admin, not an audit log. See lib/apiStats.js.
+    api_error_counts: apiStats.getStats(),
     access_control: {
       configured: auth.configured,
       user_count: auth.userCount,

@@ -44,6 +44,7 @@
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions";
+const apiStats = require("./apiStats");
 
 const MAX_RECORDS_PER_CALL = 60; // keeps the prompt (and the bill) bounded
 const MAX_TEXT_CHARS = 300; // per record sent to the model, and per quote shown
@@ -118,7 +119,9 @@ async function callGemini(recordsPayload) {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Gemini API ${res.status}${body ? `: ${body.slice(0, 300)}` : ""}`);
+    const message = `Gemini API ${res.status}${body ? `: ${body.slice(0, 300)}` : ""}`;
+    apiStats.recordApiError("gemini", res.status, message);
+    throw new Error(message);
   }
 
   const data = await res.json();

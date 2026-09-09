@@ -73,13 +73,16 @@ Admins additionally get two things a regular viewer doesn't:
   serves the shared 5-minute cache like any unforced request; the button
   itself is hidden for them, and the endpoint 403s if it's hit directly.
 - **`GET /api/health`**, the operational/config status endpoint: which
-  sources are configured, which models are in use, storage durability, and a
-  read-only roster of who's in `AUTH_USERS` and what role they have (never
-  passwords). This is the closest thing this tool has to "user management" —
-  there's no admin UI to add or remove people; RS edits `AUTH_USERS` and
-  restarts, and this endpoint just lets an admin see the result without shell
-  access. It's surfaced in the dashboard itself as a collapsible "Admin —
-  access & configuration" panel, visible only to admins.
+  sources are configured, which models are in use, storage durability, a
+  running count of failed platform/AI API calls since the process started
+  (`api_error_counts` — see `lib/apiStats.js`; this is what tells you "Gemini
+  is getting 429'd a lot" without grepping logs), and a read-only roster of
+  who's in `AUTH_USERS` and what role they have (never passwords). This is
+  the closest thing this tool has to "user management" — there's no admin UI
+  to add or remove people; RS edits `AUTH_USERS` and restarts, and this
+  endpoint just lets an admin see the result without shell access. It's
+  surfaced in the dashboard itself as a collapsible "Admin — access &
+  configuration" panel, visible only to admins.
 
 There's nothing here that needs a database because nobody self-manages their
 own role — RS decides who's who by editing one environment variable, and a

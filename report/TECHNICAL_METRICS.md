@@ -385,7 +385,7 @@ middleware explicitly lets through.
 |---|---|
 | `GET /api/analysis` | Runs the full 6-stage pipeline (or serves the 5-minute cache); returns aggregates, row-level records, videos, Twitch live snapshot, Reddit community info, Gemini's per-game discussion clusters, data-source statuses, fetch errors, sentiment-engine stats, storage info, deltas, the AI briefing, and `viewer: { user, role }` for the signed-in session. `?force=1` bypasses the cache and re-runs paid API calls — **admin-only**, `403` for a `user` role. |
 | `GET /api/methodology` | Machine-readable documentation of the engagement formula, region signal precedence, sentiment engines/scale, the 6-stage data flow, and briefing length rationale — rendered live in the dashboard's "How is this calculated?" panel rather than requiring a separate doc. |
-| `GET /api/health` | **Admin-only** (`403` for a `user` role). Configuration status per platform, semantic-analysis engine/model, discussion-summary (Gemini) engine/model, `demo_data_enabled`, snapshot storage info, and `access_control` (counts by role plus a read-only `users: [{user, role}]` roster, never passwords). |
+| `GET /api/health` | **Admin-only** (`403` for a `user` role). Configuration status per platform, semantic-analysis engine/model, discussion-summary (Gemini) engine/model, `demo_data_enabled`, snapshot storage info, `api_error_counts` (running per-source counts of failed platform/AI API calls since this process started, by status code — see `lib/apiStats.js`), and `access_control` (counts by role plus a read-only `users: [{user, role}]` roster, never passwords). |
 
 ---
 
