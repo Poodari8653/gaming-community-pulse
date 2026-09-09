@@ -135,6 +135,31 @@ function hashText(text) {
 function isConfigured() {
   return Boolean(process.env.ANTHROPIC_API_KEY && Anthropic);
 }
+function detectTheme(text) {
+  const t = (text || "").toLowerCase();
+
+  if (/(bug|glitch|crash|broken|error|lag|fps|performance|server|disconnect)/.test(t)) {
+    return "Technical";
+  }
+
+  if (/(skin|battle pass|price|expensive|microtransaction|monetization|pay to win|p2w)/.test(t)) {
+    return "Monetization";
+  }
+
+  if (/(weapon|gun|character|hero|class|balance|buff|nerf|overpowered|op\b|weak)/.test(t)) {
+    return "Balance";
+  }
+
+  if (/(update|patch|season|event|map|mode|content|feature)/.test(t)) {
+    return "Content";
+  }
+
+  if (/(cheat|hacker|toxic|abuse|ban|report|community)/.test(t)) {
+    return "Community";
+  }
+
+  return "";
+}
 
 function lexiconResult(text) {
   const r = analyzeSentiment(text);
@@ -143,7 +168,7 @@ function lexiconResult(text) {
     label: r.label,
     confidence: r.confidence,
     sarcasm: false,
-    theme: "",
+    theme: detectTheme(text),
     is_question: (text || "").trim().endsWith("?"),
     is_risk: false,
     language: "",
