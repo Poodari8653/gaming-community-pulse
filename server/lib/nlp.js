@@ -166,13 +166,19 @@ function detectRisk(text) {
   return /(refund|uninstall|review bomb|review-bomb|boycott|scam|greedy|cash grab|cashgrab|dead game|game is dead|broken game|unplayable|major outage|servers down|server down|pay to win|p2w)/.test(t);
 }
 
+function detectSarcasm(text) {
+  const t = (text || "").toLowerCase();
+
+  return /(yeah right|sure buddy|great job|nice one|love that for us|what a joke|totally fair|amazing game|perfect game|thanks devs|good one|lol sure|surely this is fine)/.test(t);
+}
+
 function lexiconResult(text) {
   const r = analyzeSentiment(text);
   return {
     score: r.score,
     label: r.label,
     confidence: r.confidence,
-    sarcasm: false,
+    sarcasm: detectSarcasm(text),
     theme: detectTheme(text),
     is_question: (text || "").trim().endsWith("?"),
     is_risk: detectRisk(text),
