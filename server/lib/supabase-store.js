@@ -1,25 +1,37 @@
-const { createClient } = require("@supabase/supabase-js");
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
 
-const supabase =
-  process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
-    ? createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_SECRET_KEY
-      )
-    : null;
+function isConfigured() {
+  return Boolean(SUPABASE_URL && SUPABASE_SECRET_KEY);
+}
 
 function toRecord(row, includeCollectedAt = false) {
+  const publishedAt = row.published_at || row.timestamp || null;
+  const textContent = row.text_content || row.text || null;
+  const sentiment = row.sentiment || row.sentiment_label || null;
+  const engagement =
+    row.engagement ?? row.engagement_index ?? null;
+
   const record = {
-    record_key: `${row.platform || ""}|${row.game || ""}|${row.source || ""}|${row.published_at || ""}|${row.author || ""}|${row.url || ""}|${row.text_content || row.text || ""}`,
+    record_key: [
+      row.platform || "",
+      row.game || "",
+      row.source || "",
+      publishedAt || "",
+      row.author || "",
+      row.url || "",
+      textContent || "",
+    ].join("|"),
+
     platform: row.platform || null,
     game: row.game || null,
     source: row.source || null,
     content_type: row.content_type || null,
     author: row.author || null,
-    published_at: row.published_at || null,
-    text_content: row.text_content || row.text || null,
-    engagement: row.engagement ?? null,
-    sentiment: row.sentiment || null,
+    published_at: publishedAt,
+    text_content: textContent,
+    engagement,
+    sentiment,
     sentiment_score: row.sentiment_score ?? null,
     language: row.language || null,
     region: row.region || null,
@@ -35,56 +47,116 @@ function toRecord(row, includeCollectedAt = false) {
   return record;
 }
 
+async function upsertRecords(records) {
+  if (!isConfigured()) {
+    return {
+      saved: false,
+      count: 0,
+      error: "Supabase environment variables are not configured",
+    };
+  }
+
+  const url =
+    `${SUPABASE_URL}/rest/v1/community_records` +
+    `?on_conflict=record_key`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_SECRET_KEY,
+        Authorization: `Bearer ${SUPABASE_SECRET_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify(records),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      console.error(
+        "Supabase record save failed:",
+        response.status,
+        errorText
+      );
+
+      return {
+        saved: false,
+        count: 0,
+        error: `${response.status}: ${errorText}`,
+      };
+    }
+
+    return {
+      saved: true,
+      count: records.length,
+    };
+  } catch (error) {
+    console.error("Supabase request failed:", error.message);
+
+    return {
+      saved: false,
+      count: 0,
+      error: error.message,
+    };
+  }
+}
+
 async function saveRawRecords(rows) {
-  if (!supabase || !Array.isArray(rows) || rows.length === 0) {
+  if (!Array.isArray(rows) || rows.length === 0) {
     return { saved: false, count: 0 };
   }
 
   const records = rows
-    .filter((row) => !row.is_sample && row.data_type !== "sample")
+    .filter(
+      (row) =>
+        !row.is_sample &&
+        row.data_type !== "sample"
+    )
     .map((row) => toRecord(row, true));
 
   if (records.length === 0) {
     return { saved: false, count: 0 };
   }
 
-  const { error } = await supabase
-    .from("community_records")
-    .upsert(records, { onConflict: "record_key" });
+  const result = await upsertRecords(records);
 
-  if (error) {
-    console.error("Supabase raw record save failed:", error.message);
-    return { saved: false, count: 0, error: error.message };
+  if (result.saved) {
+    console.log(
+      `Supabase raw records saved: ${result.count}`
+    );
   }
 
-  console.log(`Supabase raw records saved: ${records.length}`);
-  return { saved: true, count: records.length };
+  return result;
 }
 
 async function saveEnrichedRecords(rows) {
-  if (!supabase || !Array.isArray(rows) || rows.length === 0) {
+  if (!Array.isArray(rows) || rows.length === 0) {
     return { saved: false, count: 0 };
   }
 
   const records = rows
-    .filter((row) => !row.is_sample && row.data_type !== "sample")
+    .filter(
+      (row) =>
+        !row.is_sample &&
+        row.data_type !== "sample"
+    )
     .map((row) => toRecord(row));
 
   if (records.length === 0) {
     return { saved: false, count: 0 };
   }
 
-  const { error } = await supabase
-    .from("community_records")
-    .upsert(records, { onConflict: "record_key" });
+  const result = await upsertRecords(records);
 
-  if (error) {
-    console.error("Supabase enriched record save failed:", error.message);
-    return { saved: false, count: 0, error: error.message };
+  if (result.saved) {
+    console.log(
+      `Supabase enriched records saved: ${result.count}`
+    );
   }
 
-  console.log(`Supabase enriched records saved: ${records.length}`);
-  return { saved: true, count: records.length };
+  return result;
 }
 
 module.exports = {
