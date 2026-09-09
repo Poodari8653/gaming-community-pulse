@@ -141,95 +141,11 @@ function storageInfo() {
     durable: resolvedMode === "configured" || resolvedMode === "repo",
   };
 }
-async function saveRawRecords(rows) {
-  if (!supabase || !Array.isArray(rows) || rows.length === 0) {
-    return { saved: false, count: 0 };
-  }
 
-  const records = rows
-    .filter((row) => !row.is_sample && row.data_type !== "sample")
-    .map((row) => ({
-      record_key: `${row.platform || ""}|${row.game || ""}|${row.source || ""}|${row.published_at || ""}|${row.author || ""}|${row.url || ""}|${row.text_content || row.text || ""}`,
-      platform: row.platform || null,
-      game: row.game || null,
-      source: row.source || null,
-      content_type: row.content_type || null,
-      author: row.author || null,
-      published_at: row.published_at || null,
-      text_content: row.text_content || row.text || null,
-      engagement: row.engagement || null,
-      sentiment: row.sentiment || null,
-      sentiment_score: row.sentiment_score || null,
-      language: row.language || null,
-      region: row.region || null,
-      url: row.url || null,
-      raw_data: row,
-      collected_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }));
-
-  if (records.length === 0) {
-    return { saved: false, count: 0 };
-  }
-
-  const { error } = await supabase
-    .from("community_records")
-    .upsert(records, { onConflict: "record_key" });
-
-  if (error) {
-    console.error("Supabase raw record save failed:", error.message);
-    return { saved: false, count: 0, error: error.message };
-  }
-
-  return { saved: true, count: records.length };
-}
-async function saveEnrichedRecords(rows) {
-  if (!supabase || !Array.isArray(rows) || rows.length === 0) {
-    return { saved: false, count: 0 };
-  }
-
-  const records = rows
-    .filter((row) => !row.is_sample && row.data_type !== "sample")
-    .map((row) => ({
-      record_key: `${row.platform || ""}|${row.game || ""}|${row.source || ""}|${row.published_at || ""}|${row.author || ""}|${row.url || ""}|${row.text_content || row.text || ""}`,
-      platform: row.platform || null,
-      game: row.game || null,
-      source: row.source || null,
-      content_type: row.content_type || null,
-      author: row.author || null,
-      published_at: row.published_at || null,
-      text_content: row.text_content || row.text || null,
-      engagement: row.engagement || null,
-      sentiment: row.sentiment || null,
-      sentiment_score: row.sentiment_score || null,
-      language: row.language || null,
-      region: row.region || null,
-      url: row.url || null,
-      raw_data: row,
-      updated_at: new Date().toISOString(),
-    }));
-
-  if (records.length === 0) {
-    return { saved: false, count: 0 };
-  }
-
-  const { error } = await supabase
-    .from("community_records")
-    .upsert(records, { onConflict: "record_key" });
-
-  if (error) {
-    console.error("Supabase enriched record save failed:", error.message);
-    return { saved: false, count: 0, error: error.message };
-  }
-
-  return { saved: true, count: records.length };
-}
 module.exports = {
   saveSnapshot,
   readSnapshot,
   listSnapshots,
   previousSnapshot,
   storageInfo,
-  saveRawRecords,
-  saveEnrichedRecords,
 };
