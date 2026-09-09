@@ -375,7 +375,16 @@ async function enrich(rows) {
 
   return rows.map((row, i) => {
     const a = analyses[i] || { score: 0, label: "neutral", confidence: 0, theme: "", is_question: false, is_risk: false, sarcasm: false, language: "", method: "lexicon" };
-    const signals = { ...(row._regionSignals || {}), textLanguage: a.language };
+    const detectedLanguage =
+  a.language ||
+  row.language ||
+  row._regionSignals?.contentLanguage ||
+  "";
+
+const signals = {
+  ...(row._regionSignals || {}),
+  textLanguage: detectedLanguage,
+};
     const region = classifyRegion(signals);
 
     const enriched = {
@@ -399,7 +408,7 @@ async function enrich(rows) {
       sarcasm: a.sarcasm,
       is_question: a.is_question,
       is_risk: a.is_risk,
-      language: a.language,
+      language: detectedLanguage,
       region: region.region,
       region_source: region.source,
       region_confidence: region.confidence,
