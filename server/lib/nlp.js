@@ -160,6 +160,11 @@ function detectTheme(text) {
 
   return "";
 }
+function detectRisk(text) {
+  const t = (text || "").toLowerCase();
+
+  return /(refund|uninstall|review bomb|review-bomb|boycott|scam|greedy|cash grab|cashgrab|dead game|game is dead|broken game|unplayable|major outage|servers down|server down|pay to win|p2w)/.test(t);
+}
 
 function lexiconResult(text) {
   const r = analyzeSentiment(text);
@@ -170,7 +175,7 @@ function lexiconResult(text) {
     sarcasm: false,
     theme: detectTheme(text),
     is_question: (text || "").trim().endsWith("?"),
-    is_risk: false,
+    is_risk: detectRisk(text),
     language: "",
     method: "lexicon",
   };
