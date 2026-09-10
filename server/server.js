@@ -408,7 +408,7 @@ const signals = {
       sarcasm: a.sarcasm,
       is_question: a.is_question,
       is_risk: a.is_risk,
-      language: detectedLanguage,
+      
       region: region.region,
       region_source: region.source,
       region_confidence: region.confidence,
@@ -607,9 +607,9 @@ async function refresh() {
   });
 
   // 4. COMPARE — deltas against the most recent earlier snapshot, then persist.
-  const previous = store.previousSnapshot(analysis.date);
+  const previous = await store.previousSnapshot(analysis.date);  
   analysis.deltas = analytics.computeDeltas(analysis, previous);
-  const saved = store.saveSnapshot(toSnapshot(analysis));
+  const saved = await store.saveSnapshot(toSnapshot(analysis));  
   analysis.storage = { ...analysis.storage, last_write: saved };
 
   // 5. BRIEF
