@@ -169,19 +169,7 @@ function detectRisk(text) {
 function detectSarcasm(text) {
   const t = (text || "").toLowerCase();
 
-  // Strong sarcasm phrases that are usually sarcastic on their own.
-  if (/(yeah right|sure buddy|lol sure|surely this is fine|love that for us)/.test(t)) {
-    return true;
-  }
-
-  // Positive-sounding phrase combined with an obvious negative/problem signal.
-  const positivePhrase =
-    /(great job|nice one|amazing game|perfect game|thanks devs|good one|totally fair)/.test(t);
-
-  const negativeContext =
-    /(bug|broken|crash|unplayable|lag|cheat|hacker|greedy|scam|refund|uninstall|dead game|server down|servers down|pay to win|p2w|worst|terrible|awful|trash)/.test(t);
-
-  return positivePhrase && negativeContext;
+  return /(yeah right|sure buddy|lol sure|surely this is fine|love that for us|what a joke)/.test(t);
 }
 
 function lexiconResult(text) {
@@ -190,7 +178,7 @@ function lexiconResult(text) {
     score: r.score,
     label: r.label,
     confidence: r.confidence,
-    sarcasm: false,
+    sarcasm: detectSarcasm(text),
     theme: detectTheme(text),
     is_question: (text || "").trim().endsWith("?"),
     is_risk: detectRisk(text),
