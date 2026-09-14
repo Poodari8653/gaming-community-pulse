@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign in — Gaming Community Pulse</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a24; --panel-2:#1c202c; --border:#262b3a;
+    --text:#e8eaf0; --muted:#9aa1b4; --dim:#6f7688;
+    --accent:#6c8cff; --pos:#3ecf8e; --neg:#ff6b6b; --neu:#f5c451;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--text);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  a{color:var(--accent)}
+  button:focus-visible,input:focus-visible,a:focus-visible{
+    outline:3px solid var(--accent); outline-offset:2px; border-radius:4px;
+  }
+
+  .card{width:100%; max-width:420px; background:var(--panel);
+    border:1px solid var(--border); border-radius:var(--radius); padding:28px 28px 24px}
+  .brand{display:flex; align-items:baseline; gap:9px; margin-bottom:3px}
+  .brand h1{margin:0; font-size:18px; letter-spacing:-.2px}
+  .brand .tag{font-size:10.5px; text-transform:uppercase; letter-spacing:.8px;
+    color:var(--dim); border:1px solid var(--border); border-radius:5px; padding:2px 6px}
+  .sub{margin:0 0 20px; color:var(--muted); font-size:13px; line-height:1.5}
+
+  /* Tabs */
+  .tabs{display:flex; gap:4px; background:var(--panel-2); border:1px solid var(--border);
+    border-radius:9px; padding:4px; margin-bottom:20px}
+  .tab{flex:1; background:none; border:0; color:var(--muted); font:inherit; font-size:13px;
+    font-weight:600; padding:8px 10px; border-radius:6px; cursor:pointer}
+  .tab:hover{color:var(--text)}
+  .tab[aria-selected="true"]{background:var(--accent); color:#0b0d13}
+
+  label{display:block; font-size:11.5px; text-transform:uppercase; letter-spacing:.8px;
+    color:var(--dim); font-weight:700; margin:0 0 6px}
+  label .opt{text-transform:none; letter-spacing:0; font-weight:400; color:var(--dim)}
+  .field{margin-bottom:14px}
+  input{width:100%; background:var(--panel-2); color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:10px 12px; font:inherit; font-size:14px}
+  input:hover{border-color:#39405a}
+  input[aria-invalid="true"]{border-color:#7a3030}
+  .field-error{color:#ffbcbc; font-size:12px; margin:6px 0 0; min-height:0}
+  .hint{color:var(--dim); font-size:11.5px; margin:6px 0 0}
+
+  /* Password strength */
+  .meter{height:4px; background:var(--panel-2); border-radius:2px; overflow:hidden; margin-top:8px}
+  .meter > span{display:block; height:100%; width:0; background:var(--neg); transition:width .18s, background .18s}
+
+  button.submit{width:100%; margin-top:6px; background:var(--accent); color:#0b0d13;
+    border:1px solid var(--accent); border-radius:8px; padding:11px; font:inherit;
+    font-size:14px; font-weight:700; cursor:pointer}
+  button.submit:hover:not([disabled]){filter:brightness(1.08)}
+  button.submit[disabled]{opacity:.6; cursor:progress}
+
+  .banner{border-radius:8px; padding:10px 12px; font-size:13px; margin:0 0 16px; display:none}
+  .banner.show{display:block}
+  .banner.error{background:#241618; border:1px solid #5a2a2a; color:#ffbcbc}
+  .banner.ok{background:#14261d; border:1px solid #245c3c; color:#a6e7c3}
+  .banner.warn{background:#241f16; border:1px solid #5a4a22; color:#ffdca8}
+
+  .foot{margin:18px 0 0; padding-top:16px; border-top:1px solid var(--border);
+    color:var(--dim); font-size:11.5px; line-height:1.6}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(11,13,19,.35);
+    border-top-color:#0b0d13;border-radius:50%;animation:sp .7s linear infinite;
+    vertical-align:-2px;margin-right:7px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="brand">
+    <h1>Gaming Community Pulse</h1>
+    <span class="tag">Internal</span>
+  </div>
+  <p class="sub" id="subtitle">Sign in to continue.</p>
+
+  <div class="tabs" role="tablist" aria-label="Sign in or create an account">
+    <button class="tab" type="button" role="tab" id="tab-login"  aria-selected="true"  aria-controls="panel-login">Sign in</button>
+    <button class="tab" type="button" role="tab" id="tab-signup" aria-selected="false" aria-controls="panel-signup">Create account</button>
+  </div>
+
+  <div class="banner" id="banner" role="status" aria-live="polite"></div>
+
+  <!-- Both forms POST to the same endpoints the JSON API wraps, so the page
+       still works with JavaScript disabled. The script below intercepts
+       submit and uses fetch instead, for inline errors and no page reload. -->
+
+  <form id="panel-login" role="tabpanel" aria-labelledby="tab-login" method="POST" action="/login" novalidate>
+    <input type="hidden" name="redirect" id="login-redirect" value="/">
+    <div class="field">
+      <label for="login-email">Email</label>
+      <input id="login-email" name="email" type="email" autocomplete="username" inputmode="email"
+             autocapitalize="none" spellcheck="false" required>
+      <p class="field-error" id="login-email-error"></p>
+    </div>
+    <div class="field">
+      <label for="login-password">Password</label>
+      <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+      <p class="field-error" id="login-password-error"></p>
+    </div>
+    <button class="submit" type="submit" id="login-submit">Sign in</button>
+  </form>
+
+  <form id="panel-signup" role="tabpanel" aria-labelledby="tab-signup" method="POST" action="/signup" novalidate hidden>
+    <input type="hidden" name="redirect" id="signup-redirect" value="/">
+    <div class="field">
+      <label for="signup-name">Name <span class="opt">(optional)</span></label>
+      <input id="signup-name" name="display_name" type="text" autocomplete="name">
+    </div>
+    <div class="field">
+      <label for="signup-email">Email</label>
+      <input id="signup-email" name="email" type="email" autocomplete="username" inputmode="email"
+             autocapitalize="none" spellcheck="false" required>
+      <p class="field-error" id="signup-email-error"></p>
+    </div>
+    <div class="field">
+      <label for="signup-password">Password</label>
+      <input id="signup-password" name="password" type="password" autocomplete="new-password" required minlength="8">
+      <div class="meter" aria-hidden="true"><span id="strength"></span></div>
+      <p class="hint" id="strength-text">At least 8 characters. A few words you will remember beats a short complex string.</p>
+      <p class="field-error" id="signup-password-error"></p>
+    </div>
+    <div class="field">
+      <label for="signup-confirm">Confirm password</label>
+      <input id="signup-confirm" name="password_confirm" type="password" autocomplete="new-password" required>
+      <p class="field-error" id="signup-password_confirm-error"></p>
+    </div>
+    <button class="submit" type="submit" id="signup-submit">Create account</button>
+  </form>
+
+  <p class="foot" id="foot">
+    Accounts are for RS staff. There is no email verification step — you are signed
+    in as soon as the account is created.
+  </p>
+</main>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------------
+const tabs = { login: document.getElementById("tab-login"), signup: document.getElementById("tab-signup") };
+const panels = { login: document.getElementById("panel-login"), signup: document.getElementById("panel-signup") };
+const subtitle = document.getElementById("subtitle");
+const banner = document.getElementById("banner");
+
+function showBanner(message, kind){
+  banner.textContent = message;
+  banner.className = "banner show " + (kind || "error");
+}
+function hideBanner(){ banner.className = "banner"; banner.textContent = ""; }
+
+function clearFieldErrors(){
+  for (const el of document.querySelectorAll(".field-error")) el.textContent = "";
+  for (const el of document.querySelectorAll("input")) el.removeAttribute("aria-invalid");
+}
+
+function setMode(mode, opts){
+  const keep = opts && opts.keepBanner;
+  for (const key of ["login","signup"]){
+    const active = key === mode;
+    tabs[key].setAttribute("aria-selected", active ? "true" : "false");
+    panels[key].hidden = !active;
+  }
+  subtitle.textContent = mode === "login" ? "Sign in to continue." : "Create an account to access the dashboard.";
+  if (!keep) hideBanner();
+  clearFieldErrors();
+  // Update the address bar so a refresh keeps the same tab, without a reload.
+  const url = new URL(location.href);
+  url.pathname = mode === "login" ? "/login" : "/signup";
+  history.replaceState(null, "", url);
+  const focus = document.getElementById(mode === "login" ? "login-email" : "signup-email");
+  if (focus) focus.focus();
+}
+
+tabs.login.addEventListener("click", () => setMode("login"));
+tabs.signup.addEventListener("click", () => setMode("signup"));
+
+// ---------------------------------------------------------------------------
+// Carry ?redirect= through both forms, and open on the tab the path implies
+// ---------------------------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const rawRedirect = params.get("redirect") || "/";
+// Only same-site paths, so a crafted link cannot bounce someone off-site.
+const redirect = /^\/(?!\/)[^\s\\]*$/.test(rawRedirect) ? rawRedirect : "/";
+document.getElementById("login-redirect").value = redirect;
+document.getElementById("signup-redirect").value = redirect;
+
+setMode(location.pathname === "/signup" ? "signup" : "login", { keepBanner: true });
+if (params.get("created")) showBanner("Account created. Sign in to continue.", "ok");
+
+// ---------------------------------------------------------------------------
+// Password strength — guidance only, never a gate. Length dominates because
+// for a passphrase it genuinely matters more than character classes.
+// ---------------------------------------------------------------------------
+const pw = document.getElementById("signup-password");
+const meter = document.getElementById("strength");
+const strengthText = document.getElementById("strength-text");
+const BASE_HINT = strengthText.textContent;
+
+pw.addEventListener("input", () => {
+  const v = pw.value;
+  if (!v){ meter.style.width = "0"; strengthText.textContent = BASE_HINT; return; }
+  let score = Math.min(v.length / 20, 1) * 70;
+  if (/[a-z]/.test(v) && /[A-Z]/.test(v)) score += 10;
+  if (/\d/.test(v)) score += 10;
+  if (/[^A-Za-z0-9]/.test(v)) score += 10;
+  score = Math.max(6, Math.min(100, score));
+  meter.style.width = score + "%";
+  meter.style.background = score < 40 ? "var(--neg)" : score < 70 ? "var(--neu)" : "var(--pos)";
+  strengthText.textContent =
+    v.length < 8 ? `${8 - v.length} more character${8 - v.length === 1 ? "" : "s"} needed.`
+    : score < 40 ? "Weak — longer would be better."
+    : score < 70 ? "Reasonable."
+    : "Strong.";
+});
+
+// ---------------------------------------------------------------------------
+// Submit via the JSON API
+// ---------------------------------------------------------------------------
+async function submitForm(mode, form, button){
+  hideBanner();
+  clearFieldErrors();
+
+  const data = Object.fromEntries(new FormData(form).entries());
+  const label = button.textContent;
+  button.disabled = true;
+  button.innerHTML = '<span class="spin"></span>' + (mode === "login" ? "Signing in…" : "Creating account…");
+
+  try {
+    const res = await fetch(mode === "login" ? "/api/auth/login" : "/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    let payload = {};
+    try { payload = await res.json(); } catch (_) { /* non-JSON error page */ }
+
+    if (res.ok){
+      // Full navigation rather than history.push: the dashboard is a separate
+      // document and needs a real load to pick up the new session.
+      location.href = payload.redirect || redirect || "/";
+      return;
+    }
+
+    const message = payload.error || `Request failed (${res.status}).`;
+    if (payload.field){
+      const fieldEl = document.getElementById(`${mode}-${payload.field}`) ||
+                      document.getElementById(`signup-${payload.field}`);
+      const errEl = document.getElementById(`${mode}-${payload.field}-error`) ||
+                    document.getElementById(`signup-${payload.field}-error`);
+      if (errEl) errEl.textContent = message;
+      if (fieldEl){ fieldEl.setAttribute("aria-invalid", "true"); fieldEl.focus(); }
+      if (!errEl) showBanner(message, "error");
+    } else {
+      showBanner(message, res.status === 429 ? "warn" : "error");
+    }
+
+    // An account that already exists is really a prompt to sign in instead.
+    if (res.status === 409){
+      const emailValue = data.email;
+      setMode("login", { keepBanner: true });
+      document.getElementById("login-email").value = emailValue || "";
+      document.getElementById("login-password").focus();
+      showBanner(message + " Sign in below.", "warn");
+    }
+  } catch (err) {
+    showBanner("Could not reach the server. Check your connection and try again.", "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
+
+panels.login.addEventListener("submit", (e) => {
+  e.preventDefault();
+  submitForm("login", panels.login, document.getElementById("login-submit"));
+});
+panels.signup.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const p = document.getElementById("signup-password").value;
+  const c = document.getElementById("signup-confirm").value;
+  if (p !== c){
+    document.getElementById("signup-password_confirm-error").textContent = "The two passwords do not match.";
+    document.getElementById("signup-confirm").setAttribute("aria-invalid", "true");
+    document.getElementById("signup-confirm").focus();
+    return;
+  }
+  submitForm("signup", panels.signup, document.getElementById("signup-submit"));
+});
+
+// ---------------------------------------------------------------------------
+// Open on the right tab when there are no accounts yet, and surface a
+// misconfigured backend here rather than after a failed submit.
+// ---------------------------------------------------------------------------
+fetch("/api/auth/status")
+  .then((r) => r.json().then((d) => ({ status: r.status, d })))
+  .then(({ status, d }) => {
+    if (status === 503){
+      showBanner(d.error || "Accounts are not configured on this deployment.", "warn");
+      for (const b of document.querySelectorAll("button.submit")) b.disabled = true;
+      return;
+    }
+    if (d.signed_in){ location.href = redirect || "/"; return; }
+    if (d.has_accounts === false){
+      setMode("signup");
+      document.getElementById("subtitle").textContent = "Create the first account for this deployment.";
+    }
+  })
+  .catch(() => { /* the form still works; no need to alarm anyone */ });
+</script>
+</body>
+</html>

@@ -132,7 +132,12 @@ let cache = { data: null, fetchedAt: 0 };
 // static assets included, before anything else. See lib/auth.js for the
 // full design notes.
 // ---------------------------------------------------------------------------
-const auth = buildAuth(process.env.AUTH_USERS, process.env.SESSION_SECRET);
+const auth = buildAuth(process.env.SESSION_SECRET);
+
+// Express 4 does not catch rejections from async handlers — an unhandled one
+// would leave the request hanging with no response. Wrap every async auth
+// handler so a failure becomes a visible 500 instead of a stalled browser tab.
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // Render and Vercel both terminate TLS in front of this app, so the request
 // Express sees is plain HTTP even in production. `trust proxy` makes
@@ -141,8 +146,55 @@ const auth = buildAuth(process.env.AUTH_USERS, process.env.SESSION_SECRET);
 // in production while still working over plain http://localhost locally.
 app.set("trust proxy", 1);
 
-app.get("/login", auth.loginPage);
-app.post("/login", express.urlencoded({ extended: false }), auth.loginSubmit);
+// Public liveness probe for load balancers and uptime checks. Deliberately
+// minimal: a probe needs a status code, not the configuration inventory that
+// /api/health reports (which is why that one sits behind the gate).
+app.get("/healthz", (req, res) => res.set("Cache-Control", "no-store").json({ ok: true }));
+
+// Accounts are self-service: people sign up with an email and a password and
+// are signed in immediately. There is no email verification or one-time code —
+// the deployment is expected to sit behind RS's network, so this is defence in
+// depth rather than the only control.
+const formBody = express.urlencoded({ extended: false, limit: "4kb" });
+
+// Same stack-trace exposure as the JSON routes, for the no-JavaScript path.
+const formBodyError = (err, req, res, next) => {
+  if (!err) return next();
+  console.warn(`[auth] rejected form body on ${req.path}: ${err.message}`);
+  res.status(err.type === "entity.too.large" ? 413 : 400)
+     .type("html").send("<!doctype html><p>Malformed sign-in request. <a href=\"/login\">Try again</a>.");
+};
+
+// JSON auth API — what the sign-in UI calls. Public by necessity: it is how
+// you get a session in the first place. /api/auth/me returns its own 401 so
+// the front end can ask "am I signed in?" without being redirected.
+const jsonBody = express.json({ limit: "4kb" });
+
+app.get("/api/auth/status", wrap(auth.apiStatus));
+app.get("/api/auth/me", auth.apiMe);
+// A malformed or oversize body is rejected by the parser before the handler
+// runs. Without this, Express's default handler answers with an HTML page
+// containing a full stack trace and absolute server paths — on an endpoint
+// that is reachable before sign-in. Scoped to these routes rather than global.
+const jsonBodyError = (err, req, res, next) => {
+  if (!err) return next();
+  const tooBig = err.type === "entity.too.large";
+  console.warn(`[auth] rejected request body on ${req.path}: ${err.message}`);
+  res.status(tooBig ? 413 : 400).json({
+    error: tooBig ? "Request too large." : "Malformed request.",
+  });
+};
+
+app.post("/api/auth/login", jsonBody, jsonBodyError, wrap(auth.apiLogin));
+app.post("/api/auth/signup", jsonBody, jsonBodyError, wrap(auth.apiSignup));
+app.post("/api/auth/logout", auth.apiLogout);
+
+// Page routes. GET serves the rich UI; POST is the no-JavaScript fallback and
+// renders its errors server-side.
+app.get("/signup", wrap(auth.signupPage));
+app.post("/signup", formBody, formBodyError, wrap(auth.signupSubmit));
+app.get("/login", wrap(auth.loginPage));
+app.post("/login", formBody, formBodyError, wrap(auth.loginSubmit));
 app.get("/logout", auth.logout);
 
 app.use(auth.requireAuth);
@@ -732,9 +784,12 @@ app.get("/api/health", (req, res) => {
     storage: store.storageInfo(),
     access_control: {
       configured: auth.configured,
-      user_count: auth.userCount,
+      account_store: "supabase",
+      table: "app_users",
+      signup_url: "/signup",
       login_url: "/login",
       session_secret_set: !auth.sessionSecretEphemeral,
+      signed_in_as: req.authUser || null,
     },
   });
 });
@@ -749,14 +804,27 @@ if (require.main === module) {
       console.warn(
         "\n" +
         "*************************************************************************\n" +
-        "*  WARNING: AUTH_USERS is not set — this instance is WIDE OPEN, with no  *\n" +
-        "*  login required. Fine for local testing on your own machine. Before    *\n" +
-        "*  deploying anywhere reachable off your machine, set AUTH_USERS in      *\n" +
-        "*  .env (see server/.env.example) or this dashboard is public.          *\n" +
+        "*  SUPABASE_URL / SUPABASE_SECRET_KEY are not set, so accounts cannot   *\n" +
+        "*  be read. Every request will return 503 rather than serving the       *\n" +
+        "*  dashboard without a login. Set both in server/.env and run           *\n" +
+        "*  server/sql/001_app_users.sql in the Supabase SQL editor.             *\n" +
         "*************************************************************************\n"
       );
     } else {
-      console.log(`Access control: ON — ${auth.userCount} user(s) configured via AUTH_USERS. Login page at /login.`);
+      // Confirm the table actually exists, rather than only that the
+      // credentials are present — a missing table is the likeliest setup slip.
+      auth.checkTable().then(async (check) => {
+        if (!check.ok) {
+          console.warn(`\nAccess control: MISCONFIGURED — ${check.reason}\n`);
+          return;
+        }
+        const count = await auth.countUsers();
+        console.log(
+          `Access control: ON — accounts in Supabase (app_users)` +
+          (count === null ? "" : `, ${count} registered`) +
+          `. Sign up at /signup, sign in at /login.`
+        );
+      });
       if (auth.sessionSecretEphemeral) {
         console.warn(
           "\n" +
