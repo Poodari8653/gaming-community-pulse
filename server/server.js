@@ -53,7 +53,35 @@ const nlp = require("./lib/nlp");
 const { engagementIndex, aggregateIndex, METHODOLOGY: ENGAGEMENT_METHODOLOGY } = require("./lib/engagement");
 const { classifyRegion, REGIONS, METHODOLOGY: REGION_METHODOLOGY } = require("./lib/region");
 const analytics = require("./lib/analytics");
-const store = require("./lib/store");
+const loadedStore = require("./lib/store");
+
+const store = {
+  storageInfo:
+    typeof loadedStore.storageInfo === "function"
+      ? loadedStore.storageInfo
+      : () => ({
+          mode: "unavailable",
+          directory: null,
+          snapshots_held: 0,
+          retention_days: 90,
+          durable: false,
+        }),
+
+  previousSnapshot:
+    typeof loadedStore.previousSnapshot === "function"
+      ? loadedStore.previousSnapshot
+      : () => null,
+
+  saveSnapshot:
+    typeof loadedStore.saveSnapshot === "function"
+      ? loadedStore.saveSnapshot
+      : () => ({
+          saved: false,
+          mode: "unavailable",
+          error: "Snapshot store unavailable",
+        }),
+};
+const supabaseStore = require("./lib/supabase-store");
 const { generateBriefing, TARGET_WORDS } = require("./lib/briefing");
 const gemini = require("./lib/gemini");
 const apiStats = require("./lib/apiStats");
@@ -105,7 +133,12 @@ let cache = { data: null, fetchedAt: 0 };
 // static assets included, before anything else. See lib/auth.js for the
 // full design notes.
 // ---------------------------------------------------------------------------
-const auth = buildAuth(process.env.AUTH_USERS, process.env.SESSION_SECRET);
+const auth = buildAuth(process.env.SESSION_SECRET);
+
+// Express 4 does not catch rejections from async handlers — an unhandled one
+// would leave the request hanging with no response. Wrap every async auth
+// handler so a failure becomes a visible 500 instead of a stalled browser tab.
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // Render and Vercel both terminate TLS in front of this app, so the request
 // Express sees is plain HTTP even in production. `trust proxy` makes
@@ -114,8 +147,55 @@ const auth = buildAuth(process.env.AUTH_USERS, process.env.SESSION_SECRET);
 // in production while still working over plain http://localhost locally.
 app.set("trust proxy", 1);
 
-app.get("/login", auth.loginPage);
-app.post("/login", express.urlencoded({ extended: false }), auth.loginSubmit);
+// Public liveness probe for load balancers and uptime checks. Deliberately
+// minimal: a probe needs a status code, not the configuration inventory that
+// /api/health reports (which is why that one sits behind the gate).
+app.get("/healthz", (req, res) => res.set("Cache-Control", "no-store").json({ ok: true }));
+
+// Accounts are self-service: people sign up with an email and a password and
+// are signed in immediately. There is no email verification or one-time code —
+// the deployment is expected to sit behind RS's network, so this is defence in
+// depth rather than the only control.
+const formBody = express.urlencoded({ extended: false, limit: "4kb" });
+
+// Same stack-trace exposure as the JSON routes, for the no-JavaScript path.
+const formBodyError = (err, req, res, next) => {
+  if (!err) return next();
+  console.warn(`[auth] rejected form body on ${req.path}: ${err.message}`);
+  res.status(err.type === "entity.too.large" ? 413 : 400)
+     .type("html").send("<!doctype html><p>Malformed sign-in request. <a href=\"/login\">Try again</a>.");
+};
+
+// JSON auth API — what the sign-in UI calls. Public by necessity: it is how
+// you get a session in the first place. /api/auth/me returns its own 401 so
+// the front end can ask "am I signed in?" without being redirected.
+const jsonBody = express.json({ limit: "4kb" });
+
+app.get("/api/auth/status", wrap(auth.apiStatus));
+app.get("/api/auth/me", auth.apiMe);
+// A malformed or oversize body is rejected by the parser before the handler
+// runs. Without this, Express's default handler answers with an HTML page
+// containing a full stack trace and absolute server paths — on an endpoint
+// that is reachable before sign-in. Scoped to these routes rather than global.
+const jsonBodyError = (err, req, res, next) => {
+  if (!err) return next();
+  const tooBig = err.type === "entity.too.large";
+  console.warn(`[auth] rejected request body on ${req.path}: ${err.message}`);
+  res.status(tooBig ? 413 : 400).json({
+    error: tooBig ? "Request too large." : "Malformed request.",
+  });
+};
+
+app.post("/api/auth/login", jsonBody, jsonBodyError, wrap(auth.apiLogin));
+app.post("/api/auth/signup", jsonBody, jsonBodyError, wrap(auth.apiSignup));
+app.post("/api/auth/logout", auth.apiLogout);
+
+// Page routes. GET serves the rich UI; POST is the no-JavaScript fallback and
+// renders its errors server-side.
+app.get("/signup", wrap(auth.signupPage));
+app.post("/signup", formBody, formBodyError, wrap(auth.signupSubmit));
+app.get("/login", wrap(auth.loginPage));
+app.post("/login", formBody, formBodyError, wrap(auth.loginSubmit));
 app.get("/logout", auth.logout);
 
 app.use(auth.requireAuth);
@@ -348,7 +428,16 @@ async function enrich(rows) {
 
   return rows.map((row, i) => {
     const a = analyses[i] || { score: 0, label: "neutral", confidence: 0, theme: "", is_question: false, is_risk: false, sarcasm: false, language: "", method: "lexicon" };
-    const signals = { ...(row._regionSignals || {}), textLanguage: a.language };
+    const detectedLanguage =
+  a.language ||
+  row.language ||
+  row._regionSignals?.contentLanguage ||
+  "";
+
+const signals = {
+  ...(row._regionSignals || {}),
+  textLanguage: detectedLanguage,
+};
     const region = classifyRegion(signals);
 
     const enriched = {
@@ -372,7 +461,7 @@ async function enrich(rows) {
       sarcasm: a.sarcasm,
       is_question: a.is_question,
       is_risk: a.is_risk,
-      language: a.language,
+      
       region: region.region,
       region_source: region.source,
       region_confidence: region.confidence,
@@ -495,8 +584,10 @@ async function refresh() {
   const [yt, rd, dc, tw] = await Promise.all([collectYouTube(), collectReddit(), collectDiscord(), collectTwitch()]);
 
   const collected = [...yt.rows, ...rd.rows, ...dc.rows, ...tw.rows];
+  await supabaseStore.saveRawRecords(collected);
   const enriched = await enrich(collected);
-
+  await supabaseStore.saveEnrichedRecords(enriched);
+  
   // Sample rows only stand in for a platform that has NO live feed configured.
   // The moment a platform goes live, its sample rows are dropped rather than
   // stacked on top of real data.
@@ -569,9 +660,9 @@ async function refresh() {
   });
 
   // 4. COMPARE — deltas against the most recent earlier snapshot, then persist.
-  const previous = store.previousSnapshot(analysis.date);
+  const previous = await store.previousSnapshot(analysis.date);  
   analysis.deltas = analytics.computeDeltas(analysis, previous);
-  const saved = store.saveSnapshot(toSnapshot(analysis));
+  const saved = await store.saveSnapshot(toSnapshot(analysis));  
   analysis.storage = { ...analysis.storage, last_write: saved };
 
   // 5. BRIEF
@@ -717,16 +808,12 @@ app.get("/api/health", auth.requireAdmin, (req, res) => {
     api_error_counts: apiStats.getStats(),
     access_control: {
       configured: auth.configured,
-      user_count: auth.userCount,
-      admin_count: auth.adminCount,
-      viewer_count: auth.viewerCount,
+      account_store: "supabase",
+      table: "app_users",
+      signup_url: "/signup",
       login_url: "/login",
       session_secret_set: !auth.sessionSecretEphemeral,
-      // Read-only roster — usernames and roles only, never passwords. This is
-      // the "user-management view" this tool has instead of a database: RS
-      // edits AUTH_USERS and restarts to add, remove, or re-role someone;
-      // this just lets an admin see the result without shell access.
-      users: auth.configured ? auth.listUsers() : [],
+      signed_in_as: req.authUser || null,
     },
   });
 });
@@ -741,25 +828,27 @@ if (require.main === module) {
       console.warn(
         "\n" +
         "*************************************************************************\n" +
-        "*  WARNING: AUTH_USERS is not set — this instance is WIDE OPEN, with no  *\n" +
-        "*  login required. Fine for local testing on your own machine. Before    *\n" +
-        "*  deploying anywhere reachable off your machine, set AUTH_USERS in      *\n" +
-        "*  .env (see server/.env.example) or this dashboard is public.          *\n" +
+        "*  SUPABASE_URL / SUPABASE_SECRET_KEY are not set, so accounts cannot   *\n" +
+        "*  be read. Every request will return 503 rather than serving the       *\n" +
+        "*  dashboard without a login. Set both in server/.env and run           *\n" +
+        "*  server/sql/001_app_users.sql in the Supabase SQL editor.             *\n" +
         "*************************************************************************\n"
       );
     } else {
-      console.log(`Access control: ON — ${auth.userCount} user(s) configured via AUTH_USERS (${auth.adminCount} admin, ${auth.viewerCount} viewer). Login page at /login.`);
-      if (auth.adminCount === 0) {
-        console.warn(
-          "\n" +
-          "*************************************************************************\n" +
-          "*  WARNING: no user in AUTH_USERS has :admin. Nobody can force a         *\n" +
-          "*  refresh or view /api/health until you add ':admin' after one          *\n" +
-          "*  person's password, e.g. alice:pass:admin. Everyone still has full     *\n" +
-          "*  read access to the dashboard itself.                                 *\n" +
-          "*************************************************************************\n"
+      // Confirm the table actually exists, rather than only that the
+      // credentials are present — a missing table is the likeliest setup slip.
+      auth.checkTable().then(async (check) => {
+        if (!check.ok) {
+          console.warn(`\nAccess control: MISCONFIGURED — ${check.reason}\n`);
+          return;
+        }
+        const count = await auth.countUsers();
+        console.log(
+          `Access control: ON — accounts in Supabase (app_users)` +
+          (count === null ? "" : `, ${count} registered`) +
+          `. Sign up at /signup, sign in at /login.`
         );
-      }
+      });
       if (auth.sessionSecretEphemeral) {
         console.warn(
           "\n" +

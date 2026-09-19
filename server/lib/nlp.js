@@ -135,6 +135,42 @@ function hashText(text) {
 function isConfigured() {
   return Boolean(process.env.ANTHROPIC_API_KEY && Anthropic);
 }
+function detectTheme(text) {
+  const t = (text || "").toLowerCase();
+
+  if (/(bug|glitch|crash|broken|error|lag|fps|performance|server|disconnect)/.test(t)) {
+    return "Technical";
+  }
+
+  if (/(skin|battle pass|price|expensive|microtransaction|monetization|pay to win|p2w)/.test(t)) {
+    return "Monetization";
+  }
+
+  if (/(weapon|gun|character|hero|class|balance|buff|nerf|overpowered|op\b|weak)/.test(t)) {
+    return "Balance";
+  }
+
+  if (/(update|patch|season|event|map|mode|content|feature)/.test(t)) {
+    return "Content";
+  }
+
+  if (/(cheat|hacker|toxic|abuse|ban|report|community)/.test(t)) {
+    return "Community";
+  }
+
+  return "";
+}
+function detectRisk(text) {
+  const t = (text || "").toLowerCase();
+
+  return /(refund|uninstall|review bomb|review-bomb|boycott|scam|greedy|cash grab|cashgrab|dead game|game is dead|broken game|unplayable|major outage|servers down|server down|pay to win|p2w)/.test(t);
+}
+
+function detectSarcasm(text) {
+  const t = (text || "").toLowerCase();
+
+  return /(yeah right|sure buddy|lol sure|surely this is fine|love that for us|what a joke)/.test(t);
+}
 
 function lexiconResult(text) {
   const r = analyzeSentiment(text);
@@ -142,10 +178,10 @@ function lexiconResult(text) {
     score: r.score,
     label: r.label,
     confidence: r.confidence,
-    sarcasm: false,
-    theme: "",
+    sarcasm: detectSarcasm(text),
+    theme: detectTheme(text),
     is_question: (text || "").trim().endsWith("?"),
-    is_risk: false,
+    is_risk: detectRisk(text),
     language: "",
     method: "lexicon",
   };

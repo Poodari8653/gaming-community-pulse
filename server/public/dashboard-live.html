@@ -220,7 +220,8 @@
       <svg id="themeIconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     </button>
     <button class="btn btn-primary" id="refreshBtn" type="button">Refresh data</button>
-    <a class="btn" id="logoutLink" href="/logout">Log out</a>
+    <span class="pill" id="signedInAs" hidden></span>
+    <button class="btn" id="logoutBtn" type="button">Log out</button>
   </div>
 </header>
 
@@ -1197,6 +1198,25 @@ async function load(force){
     document.getElementById("refreshBtn").disabled = false;
   }
 }
+
+// Show who is signed in, and sign out via POST rather than a GET link — a
+// link prefetcher or an <img src="/logout"> can trigger a GET without intent.
+fetch("/api/auth/me", { headers: { Accept: "application/json" } })
+  .then((r) => (r.ok ? r.json() : null))
+  .then((d) => {
+    if (!d || !d.user) return;
+    const el = document.getElementById("signedInAs");
+    el.textContent = d.user.name ? `${d.user.name} (${d.user.email})` : d.user.email;
+    el.hidden = false;
+  })
+  .catch(() => { /* the dashboard is usable without the name */ });
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } catch (_) { /* fall through to the redirect either way */ }
+  location.href = "/login";
+});
 
 document.getElementById("refreshBtn").addEventListener("click", () => load(true));
 document.getElementById("searchBox").addEventListener("input", () => renderRawTable(filtered()));
