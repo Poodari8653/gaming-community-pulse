@@ -631,12 +631,17 @@ function buildAuth(rawSecret) {
     res.set("Cache-Control", "no-store").redirect(302, "/login");
   }
 
+  function requireAdmin(req, res, next) {
+    return requireAuth(req, res, next);
+  }
+
   return {
     get configured() {
       return configured();
     },
     sessionSecretEphemeral: secretEphemeral,
     requireAuth,
+    requireAdmin,
     loginPage,
     loginSubmit,
     signupPage,
